@@ -1,0 +1,1746 @@
+<!-- NomeDoApp = "Distúrbios Ácido-Base" -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interpretação de Distúrbios Ácido-Base</title>
+  <meta name="description" content="Ferramenta educacional para interpretação de gasometria arterial e cálculo do ânion gap.">
+  <meta name="theme-color" content="#1f6fb2">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  <style>
+    :root {
+      --surface: #ffffff;
+      --border: #cddbea;
+      --radius-xl: 22px;
+
+      --bg: #f5f8fc;
+      --card: #ffffff;
+      --text: #18344d;
+      --muted: #5c7388;
+      --line: #d6e2ef;
+      --primary: #1f6fb2;
+      --primary-soft: #eaf4ff;
+      --secondary: #6f6fd1;
+      --danger: #b42318;
+      --danger-soft: #fff2f2;
+      --ok: #166534;
+      --shadow: 0 6px 24px rgba(19, 53, 85, 0.08);
+      --radius-lg: 14px;
+      --radius-md: 12px;
+      --radius-sm: 10px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.45;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      color: var(--primary);
+      font-size: 1.8rem;
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .card,
+    .result {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      background: var(--primary);
+      color: #fff;
+      padding: 12px 16px;
+      font-weight: 700;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 840px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #fbfdff;
+      padding: 14px;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    .panel.secondary h2 {
+      color: var(--secondary);
+    }
+
+    .subpanel-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .subpanel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #ffffff;
+      padding: 12px;
+    }
+
+    .subpanel h3 {
+      margin: 0 0 12px;
+      font-size: 0.95rem;
+      color: var(--secondary);
+    }
+
+    .field {
+      display: grid;
+      grid-template-columns: 190px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 620px) {
+      .field {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+    }
+
+    label {
+      font-size: 0.94rem;
+      font-weight: 700;
+    }
+
+    input,
+    textarea,
+    button {
+      font: inherit;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      color: var(--text);
+    }
+
+    input[readonly] {
+      background: #f4f8fd;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.86rem;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .secondary {
+      background: #edf2f8;
+      border-color: var(--line);
+      color: var(--text);
+    }
+
+    .notice,
+    .alert {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      font-size: 0.92rem;
+    }
+
+    .notice {
+      background: var(--primary-soft);
+      color: var(--muted);
+    }
+
+    .alert {
+      display: none;
+      border: 1px solid #f1c2c2;
+      background: var(--danger-soft);
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .alert ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .alert li + li {
+      margin-top: 6px;
+    }
+
+    .sensitive-box {
+      display: none;
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid #e8cf8a;
+      background: #fff7df;
+      color: #6b4a00;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .sensitive-box h3 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      color: #6b4a00;
+    }
+
+    .sensitive-box .sensitive-block + .sensitive-block {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(107, 74, 0, 0.18);
+    }
+
+    .field-alert {
+      border-color: #f1c2c2 !important;
+      box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.08);
+      background: #fff8f8;
+    }
+
+    .result {
+      margin-top: 18px;
+      padding: 14px;
+      scroll-margin-top: 12px;
+    }
+
+    .result h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 520px;
+      resize: vertical;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.error { color: var(--danger); }
+  
+    .espaco-antes-titulo {
+      height: 1em;
+    }
+  
+    .legal-disclaimer {
+      margin: 16px 0 0;
+      font-size: 12px;
+      line-height: 1.2;
+      color: #5c6f87;
+      text-align: justify;
+      word-break: break-word;
+      background: var(--surface, #ffffff);
+      border: 1px solid var(--border, #cddbea);
+      border-radius: var(--radius-xl, 22px);
+      box-shadow: var(--shadow, 0 16px 34px rgba(18, 44, 73, 0.10));
+      padding: 16px;
+    }
+
+    .signature-block {
+      text-align: center;
+      color: #5c6f87;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-top: 12px;
+    }
+
+    .spacer-3lines {
+      height: 4.2em;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <div class="espaco-antes-titulo" aria-hidden="true"></div>
+
+    <h1>Interpretação de Distúrbios Ácido-Base</h1>
+    <p class="subtitle">Ferramenta educacional para interpretação de gasometria arterial e cálculo do ânion gap.</p>
+
+    <form id="acidBaseForm" class="card" novalidate>
+      <div class="card-header">Gasometria e ânion gap</div>
+
+      <div class="card-body">
+        <div class="grid">
+          <section class="panel" aria-labelledby="gasometriaTitulo">
+            <h2 id="gasometriaTitulo">Dados da gasometria</h2>
+
+            <div class="field">
+              <label for="ph">pH</label>
+              <input id="ph" name="ph" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 7,345">
+              <span class="meta">7,35–7,45</span>
+            </div>
+
+            <div class="field">
+              <label for="pco2">PCO₂</label>
+              <input id="pco2" name="pco2" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 28,0">
+              <span class="meta">35–45 mmHg</span>
+            </div>
+
+            <div class="field">
+              <label for="hco3">HCO₃⁻ (gasometria)</label>
+              <input id="hco3" name="hco3" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 14,0">
+              <span class="meta">22–26 mEq/L</span>
+            </div>
+
+            <div class="toolbar">
+              <button id="btnCalcular" class="primary" type="button">Calcular</button>
+              <button class="secondary" type="reset">Limpar</button>
+            </div>
+
+            <div class="notice">
+              
+            </div>
+
+          </section>
+
+          <section class="panel secondary" aria-labelledby="agTitulo">
+            <h2 id="agTitulo">Dados complementares</h2>
+
+            <div class="subpanel-grid">
+              <section class="subpanel" aria-labelledby="anionGapTitulo">
+                <h3 id="anionGapTitulo">Ânion gap</h3>
+
+                <div class="field">
+                  <label for="na">Sódio (Na⁺)</label>
+                  <input id="na" name="na" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 140">
+                  <span class="meta">mEq/L</span>
+                </div>
+
+                <div class="field">
+                  <label for="bicarb">HCO₃⁻ (bioquímica)</label>
+                  <input id="bicarb" name="bicarb" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 14,0">
+                  <span class="meta">mEq/L</span>
+                </div>
+
+                <div class="field">
+                  <label for="cl">Cloro (Cl⁻)</label>
+                  <input id="cl" name="cl" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 104">
+                  <span class="meta">mEq/L</span>
+                </div>
+
+                <div class="field">
+                  <label for="albumin">Albumina</label>
+                  <input id="albumin" name="albumin" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 4,4">
+                  <span class="meta">g/dL</span>
+                </div>
+
+                <div class="field">
+                  <label for="agap">Ânion Gap</label>
+                  <input id="agap" name="agap" type="text" readonly>
+                  <span class="meta"></span>
+                </div>
+              </section>
+
+              <section class="subpanel" aria-labelledby="oiTitulo">
+                <h3 id="oiTitulo">Índice de oxigenação </h3>
+
+                <div class="field">
+                  <label for="pao2">PaO₂</label>
+                  <input id="pao2" name="pao2" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 80,0">
+                  <span class="meta">mmHg</span>
+                </div>
+
+                <div class="field">
+                  <label for="fio2">FiO₂</label>
+                  <input id="fio2" name="fio2" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 0,21">
+                  <span class="meta">fração inspirada</span>
+                </div>
+
+                <div class="field">
+                  <label for="pmva">PMVA vias aéreas</label>
+                  <input id="pmva" name="pmva" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 12,0">
+                  <span class="meta">cmH₂O</span>
+                </div>
+
+                <div class="field">
+                  <label for="oi">Índice de oxigenação</label>
+                  <input id="oi" name="oi" type="text" readonly>
+                  <span class="meta">IO = (PMVA × FiO₂ × 100) / PaO₂</span>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      </div>
+    </form>
+
+    <section id="resultSection" class="result" aria-labelledby="resultadoTitulo">
+      <h2 id="resultadoTitulo">Interpretação</h2>
+      <textarea id="interp" name="interp" readonly></textarea>
+      <div id="status" class="status">Pronto para cálculo.</div>
+      <div id="sensitiveBox" class="sensitive-box" role="status" aria-live="polite"></div>
+      <div id="alertBox" class="alert" role="alert" aria-live="polite"></div>
+    </section>
+  
+    <div class="legal-disclaimer">
+      <strong>Aviso Legal e Isenção de Responsabilidade:</strong><br>
+      Este software e todas as informações nele contidas são fornecidos exclusivamente com propósitos educacionais e de auxílio à referência médica.
+      ESTE SISTEMA NÃO SUBSTITUI O JULGAMENTO CLÍNICO INDIVIDUAL, A ANAMNESE E O EXAME FÍSICO.
+      As informações aqui apresentadas não devem ser utilizadas isoladamente para o diagnóstico, conduta ou tratamento de pacientes.
+      A responsabilidade final por qualquer decisão clínica, prescrição ou intervenção é exclusiva do profissional de saúde assistente, devidamente habilitado.
+      Os desenvolvedores não garantem a precisão absoluta de todos os dados e isentam-se de responsabilidade por quaisquer danos diretos, indiretos, materiais ou morais que resultem do uso inadequado, interpretação equivocada ou confiança exclusiva nas informações deste sistema.
+      Pacientes e indivíduos leigos que utilizarem este software devem sempre buscar a orientação de um médico qualificado antes de tomar qualquer decisão sobre sua saúde.
+    </div>
+
+    <div class="signature-block"><strong>Desenvolvido por Adão L. L. Couto</strong></div>
+
+    <div class="spacer-3lines" aria-hidden="true"></div>
+
+  </main>
+
+  <script>
+
+    'use strict';
+
+    const AcidBaseCore = (function () {
+      const CONSTANTS = Object.freeze({
+        PH_NORMAL_MIN: 7.35,
+        PH_NORMAL_MAX: 7.45,
+        PCO2_NORMAL_MIN: 35,
+        PCO2_NORMAL_MAX: 45,
+        HCO3_NORMAL_MIN: 22,
+        HCO3_NORMAL_MAX: 26,
+        AG_NORMAL_UPPER: 12,
+        AG_BASELINE: 12,
+        ALBUMIN_REFERENCE: 4.0,
+        PH_MIN: 6.8,
+        PH_MAX: 7.8,
+        PCO2_MIN: 5,
+        PCO2_MAX: 150,
+        HCO3_MIN: 1,
+        HCO3_MAX: 80,
+        NA_MIN: 100,
+        NA_MAX: 180,
+        CL_MIN: 50,
+        CL_MAX: 150,
+        PAO2_MIN: 10,
+        PAO2_MAX: 700,
+        PMVA_MIN: 1,
+        PMVA_MAX: 80,
+        FIO2_MIN: 0.21,
+        FIO2_MAX: 1,
+        PH_CONSISTENCY_TOLERANCE: 0.04
+      });
+
+      function parseLocaleNumber(value) {
+        if (value == null) return NaN;
+        const normalized = String(value).trim().replace(/\s+/g, '').replace(',', '.');
+        if (normalized === '') return NaN;
+        return Number(normalized);
+      }
+
+      function roundNumber(value, decimals) {
+        const factor = Math.pow(10, decimals);
+        return Math.round(value * factor) / factor;
+      }
+
+      function formatNumber(value, decimals) {
+        if (!Number.isFinite(value)) return '';
+        return value.toLocaleString('pt-BR', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        });
+      }
+
+      function normalizeDigitsComma(value) {
+        const text = String(value == null ? '' : value)
+          .trim()
+          .replace(/\s+/g, '')
+          .replace(/\./g, ',')
+          .replace(/[^\d,]/g, '');
+
+        if (text === '') return '';
+
+        const pieces = text.split(',');
+        const integerPart = (pieces.shift() || '').replace(/\D/g, '');
+        const decimalPart = pieces.join('').replace(/\D/g, '');
+        return integerPart + (decimalPart ? ',' + decimalPart : '');
+      }
+
+      function normalizePhInput(value) {
+        const raw = normalizeDigitsComma(value);
+        if (!raw) return '';
+
+        const parts = raw.split(',');
+        if (parts.length > 1) {
+          const integerPart = (parts[0].replace(/^0+(?=\d)/, '') || '0').slice(0, 1);
+          const decimalPart = parts.slice(1).join('').slice(0, 3);
+          return decimalPart ? integerPart + ',' + decimalPart : integerPart;
+        }
+
+        const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
+        if (digits.length === 1) return digits;
+        return digits.slice(0, 1) + ',' + digits.slice(1, 4);
+      }
+
+      function normalizeDecimalInput(value, maxIntegerDigits, maxDecimalDigits) {
+        const raw = normalizeDigitsComma(value);
+        if (!raw) return '';
+
+        const parts = raw.split(',');
+        if (parts.length > 1) {
+          const integerPart = (parts[0].replace(/^0+(?=\d)/, '') || '0').slice(0, maxIntegerDigits);
+          const decimalPart = parts.slice(1).join('').replace(/\D/g, '').slice(0, maxDecimalDigits);
+          return decimalPart ? integerPart + ',' + decimalPart : integerPart;
+        }
+
+        const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
+        if (digits.length <= maxIntegerDigits) return digits;
+        return digits.slice(0, maxIntegerDigits) + ',' + digits.slice(maxIntegerDigits, maxIntegerDigits + maxDecimalDigits);
+      }
+
+      function normalizeTwoIntOneDecimal(value) {
+        return normalizeDecimalInput(value, 2, 1);
+      }
+
+      function normalizeThreeIntOneDecimal(value) {
+        return normalizeDecimalInput(value, 3, 1);
+      }
+
+      function normalizeMeasuredDecimalInput(value, maxIntegerDigits, maxDecimalDigits) {
+        const raw = normalizeDigitsComma(value);
+        if (!raw) return '';
+
+        const parts = raw.split(',');
+        if (parts.length > 1) {
+          const integerPart = (parts[0].replace(/^0+(?=\d)/, '') || '0').slice(0, maxIntegerDigits);
+          const decimalPart = parts.slice(1).join('').replace(/\D/g, '').slice(0, maxDecimalDigits);
+          return decimalPart ? integerPart + ',' + decimalPart : integerPart;
+        }
+
+        // PCO₂, PaO₂ e PMVA podem ter três dígitos reais.
+        // Não inserir vírgula automaticamente em valores como 151, 701 ou 120.
+        const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
+        return digits.slice(0, maxIntegerDigits);
+      }
+
+      function normalizePco2Input(value) {
+        return normalizeMeasuredDecimalInput(value, 4, 1);
+      }
+
+      function normalizePao2Input(value) {
+        return normalizeMeasuredDecimalInput(value, 4, 1);
+      }
+
+      function normalizePmvaInput(value) {
+        return normalizeDigitsComma(value);
+      }
+
+      function normalizeThreeIntOnly(value) {
+        return String(value == null ? '' : value).replace(/\D/g, '').slice(0, 3);
+      }
+
+      function normalizeAlbuminInput(value) {
+        const raw = normalizeDigitsComma(value);
+        if (!raw) return '';
+
+        const parts = raw.split(',');
+        if (parts.length > 1) {
+          const integerPart = (parts[0].replace(/\D/g, '') || '0').slice(0, 1);
+          const decimalPart = parts.slice(1).join('').replace(/\D/g, '').slice(0, 1);
+          return decimalPart ? integerPart + ',' + decimalPart : integerPart;
+        }
+
+        const digits = raw.replace(/\D/g, '');
+        if (!digits) return '';
+        return digits.length === 1 ? digits : digits.slice(0, 1) + ',' + digits.slice(1, 2);
+      }
+
+      function normalizeAlbuminBlur(value) {
+        const normalized = normalizeAlbuminInput(value);
+        if (!normalized) return '';
+        const parts = normalized.split(',');
+        const integerPart = parts[0] || '0';
+        const decimalPart = (parts[1] || '').slice(0, 1).padEnd(1, '0');
+        return integerPart + ',' + decimalPart;
+      }
+
+      function normalizeFio2Input(value) {
+        const raw = normalizeDigitsComma(value);
+        if (!raw) return '';
+
+        const parts = raw.split(',');
+        if (parts.length > 1) {
+          const integerPart = (parts[0].replace(/^0+(?=\d)/, '') || '0').slice(0, 3);
+          const decimalPart = parts.slice(1).join('').replace(/\D/g, '').slice(0, 2);
+          return decimalPart ? integerPart + ',' + decimalPart : integerPart;
+        }
+
+        return raw.replace(/\D/g, '').slice(0, 3);
+      }
+
+      function parseFio2Value(value) {
+        const parsed = parseLocaleNumber(value);
+        if (!Number.isFinite(parsed) || parsed <= 0) return NaN;
+
+        if (parsed >= CONSTANTS.FIO2_MIN && parsed <= CONSTANTS.FIO2_MAX) {
+          return parsed;
+        }
+
+        if (parsed >= 21 && parsed <= 100) {
+          return parsed / 100;
+        }
+
+        return NaN;
+      }
+
+      function normalizeFio2Blur(value) {
+        const fraction = parseFio2Value(value);
+        if (!Number.isFinite(fraction)) return '';
+        return formatNumber(roundNumber(fraction, 2), 2);
+      }
+
+      function normalizeFractionInput(value) {
+        return normalizeFio2Input(value);
+      }
+
+      function normalizeFractionBlur(value) {
+        return normalizeFio2Blur(value);
+      }
+
+      function computeAnionGap(na, hco3Bio, cl, albumin) {
+        if (![na, hco3Bio, cl].every(Number.isFinite)) return null;
+
+        const measured = na - hco3Bio - cl;
+        let corrected = null;
+
+        if (Number.isFinite(albumin) && albumin > 0) {
+          corrected = measured + 2.5 * (CONSTANTS.ALBUMIN_REFERENCE - albumin);
+        }
+
+        return { measured, corrected };
+      }
+
+      function computeOxygenationIndex(pmva, fio2, pao2) {
+        if (![pmva, fio2, pao2].every(Number.isFinite)) return null;
+        if (pmva <= 0 || fio2 <= 0 || pao2 <= 0) return null;
+
+        if (
+          pmva < CONSTANTS.PMVA_MIN || pmva > CONSTANTS.PMVA_MAX ||
+          fio2 < CONSTANTS.FIO2_MIN || fio2 > CONSTANTS.FIO2_MAX ||
+          pao2 < CONSTANTS.PAO2_MIN || pao2 > CONSTANTS.PAO2_MAX
+        ) {
+          return null;
+        }
+
+        return (pmva * fio2 * 100) / pao2;
+      }
+
+      function getAnionGapDecisionValue(anionGap) {
+        if (!anionGap) return null;
+        return Number.isFinite(anionGap.corrected) ? anionGap.corrected : anionGap.measured;
+      }
+
+      function describeAnionGap(anionGap) {
+        if (!anionGap) return 'Ânion gap não calculado por falta de dados.';
+        const lines = [
+          'Ânion gap medido: ' + formatNumber(roundNumber(anionGap.measured, 1), 1) + ' mEq/L'
+        ];
+
+        if (Number.isFinite(anionGap.corrected)) {
+          lines.push(
+            'Ânion gap corrigido pela albumina: ' +
+            formatNumber(roundNumber(anionGap.corrected, 1), 1) +
+            ' mEq/L (referência de albumina = 4,0 g/dL)'
+          );
+        }
+
+        return lines.join('\n');
+      }
+
+      function bicarbonateConsistencyWarning(hco3Abg, hco3Bio) {
+        if (!Number.isFinite(hco3Abg) || !Number.isFinite(hco3Bio)) return '';
+        const difference = Math.abs(hco3Abg - hco3Bio);
+
+        if (difference > 3) {
+          return 'Os dois campos de HCO₃⁻ diferem em ' +
+            formatNumber(roundNumber(difference, 1), 1) +
+            ' mEq/L. Revise os dados antes de interpretar o resultado.';
+        }
+
+        return '';
+      }
+
+      function partialAnionGapDataMessage(na, hco3Bio, cl, albumin) {
+        const hasNa = Number.isFinite(na);
+        const hasHco3 = Number.isFinite(hco3Bio);
+        const hasCl = Number.isFinite(cl);
+        const hasAlbumin = Number.isFinite(albumin);
+
+        if (hasAlbumin && albumin <= 0) {
+          return 'Albumina inválida: use valor maior que zero para correção do ânion gap.';
+        }
+
+        // O HCO₃⁻ pode ter sido preenchido automaticamente pela gasometria.
+        // HCO₃⁻ isolado não deve ser tratado como tentativa de calcular ânion gap.
+        const anionGapAttempted = hasNa || hasCl || hasAlbumin;
+
+        if (anionGapAttempted && (!hasNa || !hasHco3 || !hasCl)) {
+          return 'Ânion gap não calculado: preencha sódio, cloro e HCO₃⁻.';
+        }
+
+        return '';
+      }
+
+      function partialOxygenationDataMessage(pao2, fio2, pmva, fio2Raw) {
+        const hasInvalidFio2Text = String(fio2Raw == null ? '' : fio2Raw).trim() !== '' && !Number.isFinite(fio2);
+        if (hasInvalidFio2Text) {
+          return 'FiO₂ inválida: informe fração entre 0,21 e 1,00 ou porcentagem entre 21 e 100.';
+        }
+
+        const suppliedCoreInputs = [pao2, fio2, pmva].filter(Number.isFinite).length;
+
+        if (suppliedCoreInputs > 0 && suppliedCoreInputs < 3) {
+          return 'Índice de oxigenação não calculado: preencha PaO₂, FiO₂ e PMVA.';
+        }
+
+        if (Number.isFinite(fio2) && (fio2 < CONSTANTS.FIO2_MIN || fio2 > CONSTANTS.FIO2_MAX)) {
+          return 'FiO₂ inválida: informe fração entre 0,21 e 1,00 ou porcentagem entre 21 e 100.';
+        }
+
+        if (Number.isFinite(pao2) && (pao2 < CONSTANTS.PAO2_MIN || pao2 > CONSTANTS.PAO2_MAX)) {
+          return 'PaO₂ fora da faixa plausível configurada para cálculo automático. Confirme se o valor foi digitado corretamente.';
+        }
+
+        if (Number.isFinite(pmva) && (pmva < CONSTANTS.PMVA_MIN || pmva > CONSTANTS.PMVA_MAX)) {
+          return 'PMVA fora da faixa plausível configurada para cálculo automático. Confirme se o valor foi digitado corretamente.';
+        }
+
+        return '';
+      }
+
+      function hendersonEstimatedPh(pco2, hco3) {
+        if (!Number.isFinite(pco2) || !Number.isFinite(hco3) || pco2 <= 0 || hco3 <= 0) return NaN;
+        return 6.1 + Math.log10(hco3 / (0.0301 * pco2));
+      }
+
+      function rangeDistance(value, range) {
+        if (value < range[0]) return range[0] - value;
+        if (value > range[1]) return value - range[1];
+        return 0;
+      }
+
+      function centeredRange(center, margin) {
+        return [center - margin, center + margin];
+      }
+
+      function getCompensationRanges(pco2, hco3) {
+        const winterCenter = 1.5 * hco3 + 8;
+        const winter = centeredRange(winterCenter, 2);
+
+        const metabolicAlkalosisCenter = Math.min((0.7 * hco3) + 20, 55);
+        const metabolicAlkalosis = [
+          Math.max(metabolicAlkalosisCenter - 2, 0),
+          Math.min(metabolicAlkalosisCenter + 2, 55)
+        ];
+
+        const deltaRespAcid = (pco2 - 40) / 10;
+        const respAcidAcute = centeredRange(24 + (1 * deltaRespAcid), 1);
+        const respAcidChronic = centeredRange(24 + (4 * deltaRespAcid), 2);
+
+        const deltaRespAlk = (40 - pco2) / 10;
+        const respAlkAcute = centeredRange(24 - (2 * deltaRespAlk), 2);
+        const respAlkChronic = centeredRange(24 - (5 * deltaRespAlk), 2);
+
+        return {
+          winter,
+          metabolicAlkalosis,
+          respAcidAcute,
+          respAcidChronic,
+          respAlkAcute,
+          respAlkChronic
+        };
+      }
+
+      function deltaGapText(hco3, anionGapValue) {
+        if (!Number.isFinite(anionGapValue) || anionGapValue <= CONSTANTS.AG_NORMAL_UPPER) return '';
+        const deltaAg = anionGapValue - CONSTANTS.AG_BASELINE;
+        const deltaHco3 = 24 - hco3;
+        const correctedHco3 = hco3 + deltaAg;
+        const lines = [
+          'HCO₃⁻ corrigido pelo delta gap: ' + formatNumber(roundNumber(correctedHco3, 1), 1) + ' mEq/L.'
+        ];
+
+        if (deltaHco3 > 0) {
+          const deltaRatio = deltaAg / deltaHco3;
+          lines.push('Delta ratio: ' + formatNumber(roundNumber(deltaRatio, 2), 2) + '.');
+        } else {
+          lines.push('Delta ratio não calculado porque o HCO₃⁻ não está reduzido em relação a 24 mEq/L.');
+        }
+
+        return lines.join('\n');
+      }
+
+      function buildSensitiveFindingsText(values, interpretation) {
+        const findings = [];
+        const anionGapValue = getAnionGapDecisionValue(values.anionGap);
+        const ranges = getCompensationRanges(values.pco2, values.hco3Abg);
+
+        if (Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER) {
+          const deltaAg = anionGapValue - CONSTANTS.AG_BASELINE;
+          const correctedHco3 = values.hco3Abg + deltaAg;
+          const deltaHco3 = 24 - values.hco3Abg;
+          const lines = [
+            'Avaliação do delta gap / delta ratio:',
+            'HCO₃⁻ corrigido pelo delta gap: ' + formatNumber(roundNumber(correctedHco3, 1), 1) + ' mEq/L.'
+          ];
+
+          if (deltaHco3 > 0) {
+            const deltaRatio = deltaAg / deltaHco3;
+            lines.push('Delta ratio: ' + formatNumber(roundNumber(deltaRatio, 2), 2) + '.');
+            if (deltaRatio > 2) lines.push('Achado forte: delta ratio acima de 2. Sugere alcalose metabólica associada ou retenção crônica de bicarbonato.');
+            else if (deltaRatio < 0.8) lines.push('Achado forte: delta ratio abaixo de 0,8. Sugere acidose metabólica hiperclorêmica associada.');
+          } else {
+            lines.push('Delta ratio não calculado porque o HCO₃⁻ não está reduzido em relação a 24 mEq/L.');
+          }
+
+          if (correctedHco3 >= 30) lines.push('Achado forte: HCO₃⁻ corrigido pelo delta gap ≥ 30 mEq/L. Sugere alcalose metabólica associada.');
+          else if (correctedHco3 > 26) lines.push('Achado sensível: HCO₃⁻ corrigido pelo delta gap acima de 26 mEq/L. Pode sugerir alcalose metabólica associada leve, se compatível com o contexto clínico.');
+          else if (correctedHco3 < 22) lines.push('Achado forte: HCO₃⁻ corrigido pelo delta gap < 22 mEq/L. Sugere acidose metabólica hiperclorêmica associada.');
+
+          findings.push(lines.join('\n'));
+        } else if (Number.isFinite(anionGapValue)) {
+          findings.push('Nota sobre o ânion gap: a referência de normalidade pressupõe fosfato sérico dentro da normalidade. Hipofosfatemia importante pode reduzir o ânion gap basal e mascarar elevação discreta de ânions não mensurados.');
+        }
+
+        if (Number.isFinite(values.hco3Abg) && values.hco3Abg > CONSTANTS.HCO3_NORMAL_MAX && Number.isFinite(values.pco2)) {
+          const center = Math.min((0.7 * values.hco3Abg) + 20, 55);
+          const sensitiveLow = Math.max(center - 2, 0);
+          const sensitiveHigh = Math.min(center + 2, 55);
+          const broad = ranges.metabolicAlkalosis;
+          if (values.pco2 >= broad[0] && values.pco2 <= broad[1] && (values.pco2 < sensitiveLow || values.pco2 > sensitiveHigh)) {
+            findings.push(
+              'Alcalose metabólica – faixa sensível de compensação:\n' +
+              'PCO₂ observada = ' + formatNumber(roundNumber(values.pco2, 1), 1) + ' mmHg. Centro esperado ≈ ' + formatNumber(roundNumber(center, 1), 1) + ' mmHg; faixa sensível ≈ ' + formatNumber(roundNumber(sensitiveLow, 1), 1) + ' a ' + formatNumber(roundNumber(sensitiveHigh, 1), 1) + ' mmHg.\n' +
+              'Achado sensível: a PCO₂ está dentro da faixa convencional de compensação, mas fora da faixa estreita centrada. Considerar componente respiratório associado se compatível com o contexto clínico.'
+            );
+          }
+        }
+
+        if (/Acidose respiratória aguda/i.test(String(interpretation || '')) && Number.isFinite(values.pco2) && Number.isFinite(values.hco3Abg)) {
+          const deltaRespAcid = (values.pco2 - 40) / 10;
+          const acuteCenter = 24 + deltaRespAcid;
+          const difference = values.hco3Abg - acuteCenter;
+          if (difference > 1 && difference <= 2) {
+            findings.push(
+              'Acidose respiratória aguda – faixa sensível de compensação:\n' +
+              'HCO₃⁻ observado = ' + formatNumber(roundNumber(values.hco3Abg, 1), 1) + ' mEq/L. Centro esperado ≈ ' + formatNumber(roundNumber(acuteCenter, 1), 1) + ' mEq/L.\n' +
+              'Achado sensível: HCO₃⁻ discretamente acima do centro esperado para o quadro agudo. Pode sugerir alcalose metabólica leve associada ou bicarbonato basal previamente elevado.'
+            );
+          } else if (difference < -1 && difference >= -2) {
+            findings.push(
+              'Acidose respiratória aguda – faixa sensível de compensação:\n' +
+              'HCO₃⁻ observado = ' + formatNumber(roundNumber(values.hco3Abg, 1), 1) + ' mEq/L. Centro esperado ≈ ' + formatNumber(roundNumber(acuteCenter, 1), 1) + ' mEq/L.\n' +
+              'Achado sensível: HCO₃⁻ discretamente abaixo do centro esperado para o quadro agudo. Pode sugerir acidose metabólica leve associada.'
+            );
+          }
+        }
+
+        return findings.join('\n\n');
+      }
+
+      function collectCompatibilityAlerts(values) {
+        const messages = [];
+        const fields = new Set();
+
+        const agMessage = partialAnionGapDataMessage(values.na, values.hco3Bio, values.cl, values.albumin);
+        if (agMessage) {
+          messages.push(agMessage);
+          fields.add('na');
+          fields.add('bicarb');
+          fields.add('cl');
+          if (Number.isFinite(values.albumin) && values.albumin <= 0) fields.add('albumin');
+        }
+
+        if (Number.isFinite(values.na) && (values.na < CONSTANTS.NA_MIN || values.na > CONSTANTS.NA_MAX)) {
+          messages.push('Sódio fora da faixa plausível configurada. Confirme se o valor foi digitado corretamente.');
+          fields.add('na');
+        }
+
+        if (Number.isFinite(values.cl) && (values.cl < CONSTANTS.CL_MIN || values.cl > CONSTANTS.CL_MAX)) {
+          messages.push('Cloro fora da faixa plausível configurada. Confirme se o valor foi digitado corretamente.');
+          fields.add('cl');
+        }
+
+        if (Number.isFinite(values.hco3Bio) && (values.hco3Bio < CONSTANTS.HCO3_MIN || values.hco3Bio > CONSTANTS.HCO3_MAX)) {
+          messages.push('HCO₃⁻ fora da faixa plausível configurada. Confirme se o valor foi digitado corretamente.');
+          fields.add('bicarb');
+        }
+
+        const oiMessage = partialOxygenationDataMessage(values.pao2, values.fio2, values.pmva, values.fio2Raw);
+        if (oiMessage) {
+          messages.push(oiMessage);
+          fields.add('pao2');
+          fields.add('fio2');
+          fields.add('pmva');
+        }
+
+        const bicarbonateWarning = bicarbonateConsistencyWarning(values.hco3Abg, values.hco3Bio);
+        if (bicarbonateWarning) {
+          messages.push(bicarbonateWarning);
+          fields.add('hco3');
+          fields.add('bicarb');
+        }
+
+        const estimatedPh = hendersonEstimatedPh(values.pco2, values.hco3Abg);
+        if (Number.isFinite(values.ph) && Number.isFinite(estimatedPh)) {
+          const difference = Math.abs(values.ph - estimatedPh);
+          if (difference > CONSTANTS.PH_CONSISTENCY_TOLERANCE) {
+            messages.push(
+              'Valores incompatíveis entre pH, PCO₂ e HCO₃⁻. O pH estimado pelos outros dois parâmetros seria ' +
+              formatNumber(roundNumber(estimatedPh, 2), 2) +
+              '. Diferença maior que ' + formatNumber(CONSTANTS.PH_CONSISTENCY_TOLERANCE, 2) +
+              ': trate a amostra/dados como clinicamente duvidosos antes de interpretar.'
+            );
+            fields.add('ph');
+            fields.add('pco2');
+            fields.add('hco3');
+          }
+        }
+
+        if (values.anionGap && Number.isFinite(values.anionGap.measured) && values.anionGap.measured < 0) {
+          messages.push('Ânion gap negativo é incomum e costuma indicar erro de entrada ou exame. Revise sódio, cloro e HCO₃⁻.');
+          fields.add('na');
+          fields.add('cl');
+          fields.add('bicarb');
+        }
+
+        if (Number.isFinite(values.albumin) && values.albumin > 0 && (values.albumin < 1 || values.albumin > 6)) {
+          messages.push('Albumina fora da faixa habitual. Confirme se o valor foi digitado corretamente.');
+          fields.add('albumin');
+        }
+
+        return {
+          messages,
+          fields: Array.from(fields)
+        };
+      }
+
+      function buildCompensationText(ranges) {
+        return {
+          winter:
+            'PCO₂ esperada (fórmula de Winter): ' +
+            formatNumber(roundNumber(ranges.winter[0], 1), 1) + ' a ' +
+            formatNumber(roundNumber(ranges.winter[1], 1), 1) + ' mmHg',
+
+          metabolicAlkalosis:
+            'PCO₂ esperada: ' +
+            formatNumber(roundNumber(ranges.metabolicAlkalosis[0], 1), 1) + ' a ' +
+            formatNumber(roundNumber(ranges.metabolicAlkalosis[1], 1), 1) +
+            ' mmHg (limite superior de compensação ≈ 55 mmHg)',
+
+          respAcid:
+            'HCO₃⁻ esperado no quadro agudo: ' +
+            formatNumber(roundNumber(ranges.respAcidAcute[0], 1), 1) + ' a ' +
+            formatNumber(roundNumber(ranges.respAcidAcute[1], 1), 1) + ' mEq/L\n' +
+            'HCO₃⁻ esperado no quadro crônico: ' +
+            formatNumber(roundNumber(ranges.respAcidChronic[0], 1), 1) + ' a ' +
+            formatNumber(roundNumber(ranges.respAcidChronic[1], 1), 1) + ' mEq/L',
+
+          respAlk:
+            'HCO₃⁻ esperado no quadro agudo: ' +
+            formatNumber(roundNumber(ranges.respAlkAcute[0], 1), 1) + ' a ' +
+            formatNumber(roundNumber(ranges.respAlkAcute[1], 1), 1) + ' mEq/L\n' +
+            'HCO₃⁻ esperado no quadro crônico: ' +
+            formatNumber(roundNumber(ranges.respAlkChronic[0], 1), 1) + ' a ' +
+            formatNumber(roundNumber(ranges.respAlkChronic[1], 1), 1) + ' mEq/L'
+        };
+      }
+
+      function appendElevatedAnionGapAssessment(interpretation, hco3, anionGapValue) {
+        if (!Number.isFinite(anionGapValue) || anionGapValue <= CONSTANTS.AG_NORMAL_UPPER) return interpretation;
+
+        if (/ânion gap aumentado/i.test(interpretation)) return interpretation;
+
+        return interpretation + '\n' + (
+          hco3 >= 22 && hco3 <= 23
+            ? 'Ânion gap aumentado com HCO₃⁻ limítrofe/baixo-normal.'
+            : 'Ânion gap aumentado: avaliar no quadro de achados sensíveis.'
+        );
+      }
+
+      function classifyAcidBase(values) {
+        const anionGapValue = getAnionGapDecisionValue(values.anionGap);
+        const ranges = getCompensationRanges(values.pco2, values.hco3Abg);
+        const expected = buildCompensationText(ranges);
+
+        const flags = {
+          metabolicAcidosis: values.hco3Abg < CONSTANTS.HCO3_NORMAL_MIN,
+          metabolicAlkalosis: values.hco3Abg > CONSTANTS.HCO3_NORMAL_MAX,
+          respiratoryAcidosis: values.pco2 > CONSTANTS.PCO2_NORMAL_MAX,
+          respiratoryAlkalosis: values.pco2 < CONSTANTS.PCO2_NORMAL_MIN
+        };
+
+        let interpretation = '';
+        let compensationInfo = '';
+
+        if (flags.metabolicAcidosis && flags.respiratoryAcidosis) {
+          interpretation = 'Distúrbio misto: acidose metabólica + acidose respiratória.';
+          if (Number.isFinite(anionGapValue)) {
+            interpretation += anionGapValue <= CONSTANTS.AG_NORMAL_UPPER
+              ? '\nÂnion gap normal.'
+              : '\nÂnion gap aumentado.';
+          }
+          compensationInfo = expected.winter;
+        } else if (flags.metabolicAlkalosis && flags.respiratoryAlkalosis) {
+          interpretation = 'Distúrbio misto: alcalose metabólica + alcalose respiratória.';
+          compensationInfo = expected.metabolicAlkalosis;
+        } else if (flags.metabolicAcidosis && flags.respiratoryAlkalosis) {
+          const winterDistance = rangeDistance(values.pco2, ranges.winter);
+          const chronicRespAlkDistance = rangeDistance(values.hco3Abg, ranges.respAlkChronic);
+          const agElevated = Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER;
+          const likelyPureChronicRespAlkosis = values.ph > 7.40 && chronicRespAlkDistance <= 2;
+
+          if (likelyPureChronicRespAlkosis) {
+            interpretation = 'Alcalose respiratória crônica (compensada).';
+            compensationInfo = expected.respAlk;
+          } else if (winterDistance === 0) {
+            interpretation = 'Acidose metabólica primária';
+            interpretation += Number.isFinite(anionGapValue)
+              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
+              : ', sem dados suficientes para classificar o ânion gap.';
+            interpretation += '\nCompensação respiratória adequada.';
+            compensationInfo = expected.winter;
+          } else if (values.pco2 < ranges.winter[0]) {
+            interpretation = 'Distúrbio misto: acidose metabólica + alcalose respiratória';
+            interpretation += Number.isFinite(anionGapValue)
+              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
+              : '.';
+            compensationInfo = expected.winter + '\n' + expected.respAlk;
+          } else {
+            interpretation = 'Acidose metabólica com resposta ventilatória abaixo do esperado para a fórmula de Winter';
+            interpretation += Number.isFinite(anionGapValue)
+              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
+              : '.';
+            interpretation += '\nConsidere componente respiratório acidótico relativo, apesar da PCO₂ estar abaixo do intervalo normal absoluto.';
+            compensationInfo = expected.winter;
+          }
+        } else if (flags.metabolicAlkalosis && flags.respiratoryAcidosis) {
+          const metabolicAlkalosisDistance = rangeDistance(values.pco2, ranges.metabolicAlkalosis);
+          const acuteRespAcidDistance = rangeDistance(values.hco3Abg, ranges.respAcidAcute);
+          const chronicRespAcidDistance = rangeDistance(values.hco3Abg, ranges.respAcidChronic);
+          if (
+            values.ph < CONSTANTS.PH_NORMAL_MIN &&
+            values.hco3Abg > ranges.respAcidAcute[1] &&
+            values.hco3Abg < ranges.respAcidChronic[0]
+          ) {
+            interpretation = 'Acidose respiratória crônica agudizada (ou compensação em andamento).';
+            compensationInfo = expected.respAcid;
+          } else if (values.ph < CONSTANTS.PH_NORMAL_MIN && values.hco3Abg > ranges.respAcidAcute[1]) {
+            interpretation = 'Acidose respiratória aguda com alcalose metabólica associada.';
+            compensationInfo = expected.respAcid;
+          } else if (values.ph < 7.38 && acuteRespAcidDistance <= chronicRespAcidDistance + 0.25) {
+            interpretation = 'Acidose respiratória aguda.';
+            compensationInfo = expected.respAcid;
+          } else if (values.ph < 7.40 && chronicRespAcidDistance <= 2) {
+            interpretation = 'Acidose respiratória crônica (compensada).';
+            compensationInfo = expected.respAcid;
+          } else if (values.ph >= 7.40 && chronicRespAcidDistance <= 2) {
+            interpretation = 'Distúrbio misto: acidose respiratória crônica + alcalose metabólica.';
+            compensationInfo = expected.respAcid + '\n' + expected.metabolicAlkalosis;
+          } else if (values.ph > 7.40 && metabolicAlkalosisDistance === 0) {
+            interpretation = 'Alcalose metabólica primária.\nCompensação respiratória adequada.';
+            compensationInfo = expected.metabolicAlkalosis;
+          } else {
+            interpretation = 'Distúrbio misto: alcalose metabólica + acidose respiratória.';
+            compensationInfo = expected.metabolicAlkalosis + '\n' + expected.respAcid;
+          }
+        } else if (flags.metabolicAcidosis) {
+          interpretation = 'Acidose metabólica primária';
+          interpretation += Number.isFinite(anionGapValue)
+            ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
+            : ', sem dados suficientes para classificar o ânion gap.';
+
+          if (values.pco2 > ranges.winter[1]) {
+            interpretation += '\nCompensação respiratória insuficiente ou componente respiratório acidótico associado.';
+          } else if (values.pco2 < ranges.winter[0]) {
+            interpretation += '\nAlcalose respiratória associada.';
+          } else {
+            interpretation += '\nCompensação respiratória adequada.';
+          }
+
+          compensationInfo = expected.winter;
+        } else if (flags.metabolicAlkalosis) {
+          interpretation = 'Alcalose metabólica primária.';
+
+          if (values.pco2 > ranges.metabolicAlkalosis[1]) {
+            interpretation += '\nCompensação respiratória acima do esperado ou acidose respiratória associada.';
+          } else if (values.pco2 < ranges.metabolicAlkalosis[0]) {
+            interpretation += '\nAlcalose respiratória associada.';
+          } else {
+            interpretation += '\nCompensação respiratória adequada.';
+          }
+
+          compensationInfo = expected.metabolicAlkalosis;
+        } else if (flags.respiratoryAcidosis) {
+          const acuteDistance = rangeDistance(values.hco3Abg, ranges.respAcidAcute);
+          const chronicDistance = rangeDistance(values.hco3Abg, ranges.respAcidChronic);
+
+          if (values.ph < CONSTANTS.PH_NORMAL_MIN && values.hco3Abg > ranges.respAcidAcute[1]) {
+            interpretation = 'Acidose respiratória aguda com alcalose metabólica associada.';
+          } else if (values.ph < CONSTANTS.PH_NORMAL_MIN && values.hco3Abg < ranges.respAcidAcute[0]) {
+            interpretation = 'Acidose respiratória aguda com acidose metabólica associada.';
+          } else if (values.hco3Abg > ranges.respAcidChronic[1] + 2.5) {
+            interpretation = 'Acidose respiratória com alcalose metabólica associada.';
+          } else if (chronicDistance + 0.25 < acuteDistance) {
+            interpretation = 'Acidose respiratória crônica (compensada).';
+          } else {
+            interpretation = 'Acidose respiratória aguda.';
+          }
+
+          compensationInfo = expected.respAcid;
+        } else if (flags.respiratoryAlkalosis) {
+          const acuteDistance = rangeDistance(values.hco3Abg, ranges.respAlkAcute);
+          const chronicDistance = rangeDistance(values.hco3Abg, ranges.respAlkChronic);
+
+          if (values.hco3Abg < ranges.respAlkChronic[0] - 2.5) {
+            interpretation = 'Alcalose respiratória com acidose metabólica associada';
+            interpretation += Number.isFinite(anionGapValue)
+              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
+              : '.';
+          } else if (chronicDistance + 0.25 < acuteDistance) {
+            interpretation = 'Alcalose respiratória crônica (compensada).';
+          } else {
+            interpretation = 'Alcalose respiratória aguda.';
+          }
+
+          compensationInfo = expected.respAlk;
+        } else if (Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER) {
+          if (values.hco3Abg >= 22 && values.hco3Abg <= 23) {
+            interpretation =
+              'Ânion gap aumentado com HCO₃⁻ limítrofe/baixo-normal.\n' +
+              'Considere acidose metabólica de ânion gap aumentado mascarada por outro distúrbio metabólico ou compensação.';
+          } else {
+            interpretation =
+              'Ânion gap aumentado com HCO₃⁻ aparentemente normal.\n' +
+              'Considere distúrbio misto e correlacione clinicamente.';
+          }
+        } else if (Number.isFinite(values.ph) && values.ph < CONSTANTS.PH_NORMAL_MIN) {
+          interpretation =
+            'Acidemia com PCO₂ e/ou HCO₃⁻ em faixa limítrofe.\n' +
+            'Revise arredondamento, amostra e contexto clínico; considerar distúrbio ácido-base inicial ou misto não classificado pelos limiares automáticos.';
+        } else if (Number.isFinite(values.ph) && values.ph > CONSTANTS.PH_NORMAL_MAX) {
+          interpretation =
+            'Alcalemia com PCO₂ e/ou HCO₃⁻ em faixa limítrofe.\n' +
+            'Revise arredondamento, amostra e contexto clínico; considerar distúrbio ácido-base inicial ou misto não classificado pelos limiares automáticos.';
+        } else {
+          interpretation = 'Gasometria sem distúrbio ácido-base evidente pelos critérios desta ferramenta.';
+        }
+
+        interpretation = appendElevatedAnionGapAssessment(interpretation, values.hco3Abg, anionGapValue);
+
+        const estimatedPh = roundNumber(hendersonEstimatedPh(values.pco2, values.hco3Abg), 2);
+        const estimatedPco2 = roundNumber(values.hco3Abg / (0.0301 * Math.pow(10, values.ph - 6.1)), 0);
+        const estimatedHco3 = roundNumber(Math.pow(10, values.ph - 6.1) * 0.0301 * values.pco2, 0);
+
+        const validationText =
+          'Checagem de consistência pelos valores informados:\n' +
+          'pH estimado = ' + formatNumber(estimatedPh, 2) + '\n' +
+          'PCO₂ estimada = ' + formatNumber(estimatedPco2, 0) + ' mmHg\n' +
+          'HCO₃⁻ estimado = ' + formatNumber(estimatedHco3, 0) + ' mEq/L';
+
+        const oxygenationIndexText = values.oxygenationIndex == null
+          ? ''
+          : 'Índice de oxigenação: ' + formatNumber(roundNumber(values.oxygenationIndex, 1), 1);
+        const sensitiveFindingsText = buildSensitiveFindingsText(values, interpretation);
+
+        return {
+          interpretation,
+          compensationInfo,
+          anionGapText: describeAnionGap(values.anionGap),
+          oxygenationIndexText,
+          validationText,
+          sensitiveFindingsText
+        };
+      }
+
+      function buildOutputText(result) {
+        return [
+          result.interpretation,
+          result.compensationInfo,
+          result.anionGapText,
+          result.oxygenationIndexText,
+          result.validationText,
+          result.sensitiveFindingsText
+        ].filter(Boolean).join('\n\n');
+      }
+
+      function runSelfTests() {
+        const maskResults = [
+          { name: 'pH 7345 -> 7,345', actual: normalizePhInput('7345'), expect: '7,345' },
+          { name: 'PCO2 28,5 preservado', actual: normalizePco2Input('28,5'), expect: '28,5' },
+          { name: 'PCO2 100 -> 100', actual: normalizePco2Input('100'), expect: '100' },
+          { name: 'PCO2 151 -> 151 para validação, sem conversão silenciosa', actual: normalizePco2Input('151'), expect: '151' },
+          { name: 'PaO2 701 -> 701 para validação, sem conversão silenciosa', actual: normalizePao2Input('701'), expect: '701' },
+          { name: 'PMVA 120 preservado como valor inserido', actual: normalizePmvaInput('120'), expect: '120' },
+          { name: 'HCO3 140 -> 14,0', actual: normalizeTwoIntOneDecimal('140'), expect: '14,0' },
+          { name: 'Na 140 -> 140', actual: normalizeThreeIntOnly('140'), expect: '140' },
+          { name: 'Albumina 44 -> 4,4', actual: normalizeAlbuminBlur('44'), expect: '4,4' },
+          { name: 'FiO2 021 -> 0,21', actual: normalizeFio2Blur('021'), expect: '0,21' },
+          { name: 'FiO2 21 -> 0,21', actual: normalizeFio2Blur('21'), expect: '0,21' },
+          { name: 'FiO2 40 -> 0,40', actual: normalizeFio2Blur('40'), expect: '0,40' },
+          { name: 'FiO2 100 -> 1,00', actual: normalizeFio2Blur('100'), expect: '1,00' },
+          { name: 'FiO2 2 inválida -> vazio no blur', actual: normalizeFio2Blur('2'), expect: '' }
+        ].map(function (testCase) {
+          return Object.assign({}, testCase, { passed: testCase.actual === testCase.expect });
+        });
+
+        const duplicateDeltaText = deltaGapText(12, 16);
+        const duplicateDeltaMatches = duplicateDeltaText.match(/Sugere acidose metabólica hiperclorêmica associada\./g) || [];
+        const respRanges = getCompensationRanges(60, 24);
+
+        const arithmeticResults = [
+          { name: 'Anion gap normal 140-24-104 = 12', passed: computeAnionGap(140, 24, 104, 4.0).measured === 12 },
+          { name: 'Anion gap corrigido por albumina referência 4,0: AG 8, albumina 2,0 = 13', passed: roundNumber(computeAnionGap(140, 12, 120, 2.0).corrected, 1) === 13.0 },
+          { name: 'IO = (12 × 0,40 × 100) / 80 = 6,0', passed: roundNumber(computeOxygenationIndex(12, 0.40, 80), 1) === 6.0 },
+          { name: 'FiO2 40% é convertido para 0,40', passed: roundNumber(parseFio2Value('40'), 2) === 0.40 },
+          { name: 'FiO2 2 é inválida, não 0,02', passed: Number.isNaN(parseFio2Value('2')) },
+          { name: 'PMVA 120 permanece 120 e gera alerta de plausibilidade', passed: /PMVA fora da faixa plausível/.test(partialOxygenationDataMessage(100, 0.40, 120, '0,40')) },
+          { name: 'IO não calcula com PMVA fora de faixa', passed: computeOxygenationIndex(120, 0.40, 100) === null },
+          { name: 'IO não calcula com FiO2 inválida', passed: computeOxygenationIndex(12, parseFio2Value('2'), 80) === null },
+          { name: 'IO não calcula com PaO2 fora de faixa', passed: computeOxygenationIndex(12, 0.40, 701) === null },
+          { name: 'HCO3 isolado não dispara alerta de ânion gap incompleto', passed: partialAnionGapDataMessage(NaN, 24, NaN, NaN) === '' },
+          { name: 'Na isolado com HCO3 sincronizado dispara alerta de ânion gap incompleto', passed: /preencha sódio, cloro e HCO₃⁻/.test(partialAnionGapDataMessage(140, 24, NaN, NaN)) },
+          { name: 'Delta gap informa HCO3 corrigido', passed: /HCO₃⁻ corrigido pelo delta gap/.test(deltaGapText(22, 25)) },
+          { name: 'Delta gap simplificado sem sugestão hiperclorêmica duplicada', passed: duplicateDeltaMatches.length === 0 },
+          { name: 'Resp acidosis acute strict center±1 at PCO2 60 -> 25 a 27', passed: roundNumber(respRanges.respAcidAcute[0], 1) === 25.0 && roundNumber(respRanges.respAcidAcute[1], 1) === 27.0 },
+          { name: 'Resp acidosis chronic strict center±2 at PCO2 60 -> 30 a 34', passed: roundNumber(respRanges.respAcidChronic[0], 1) === 30.0 && roundNumber(respRanges.respAcidChronic[1], 1) === 34.0 },
+          { name: 'Henderson-Hasselbalch alerta com diferença > 0,04', passed: collectCompatibilityAlerts({ ph: 7.40, pco2: 40, hco3Abg: 21.5, hco3Bio: 21.5, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /clinicamente duvidosos/.test(message); }) }
+        ];
+
+        const clinicalCases = [
+          { name: 'Gasometria normal', values: { ph: 7.40, pco2: 40, hco3Abg: 24, anionGap: null, oxygenationIndex: null }, expect: /sem distúrbio ácido-base evidente/i },
+          { name: 'Acidose metabólica com compensação adequada', values: { ph: 7.28, pco2: 26, hco3Abg: 12, anionGap: computeAnionGap(140, 12, 120, 2.0), oxygenationIndex: null }, expect: /acidose metabólica primária/i },
+          { name: 'Alcalose metabólica compensada', values: { ph: 7.52, pco2: 48, hco3Abg: 38, anionGap: null, oxygenationIndex: null }, expect: /alcalose metabólica primária/i },
+          { name: 'Acidose respiratória aguda', values: { ph: 7.25, pco2: 60, hco3Abg: 26, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória aguda/i },
+          { name: 'Acidose respiratória crônica agudizada ou compensação em andamento', values: { ph: 7.29, pco2: 60, hco3Abg: 29, anionGap: null, oxygenationIndex: null }, expect: /crônica agudizada/i },
+          { name: 'Acidose respiratória crônica', values: { ph: 7.36, pco2: 60, hco3Abg: 31, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória crônica/i },
+          { name: 'Acidose respiratória crônica + alcalose metabólica com pH 7,40', values: { ph: 7.40, pco2: 60, hco3Abg: 32, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória crônica \+ alcalose metabólica/i },
+          { name: 'Acidose respiratória crônica + alcalose metabólica com pH acima de 7,40', values: { ph: 7.42, pco2: 60, hco3Abg: 32, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória crônica \+ alcalose metabólica/i },
+          { name: 'Alcalose respiratória aguda', values: { ph: 7.50, pco2: 30, hco3Abg: 22, anionGap: null, oxygenationIndex: null }, expect: /alcalose respiratória aguda/i },
+          { name: 'Alcalose respiratória crônica', values: { ph: 7.46, pco2: 30, hco3Abg: 19, anionGap: null, oxygenationIndex: null }, expect: /alcalose respiratória crônica/i },
+          { name: 'Distúrbio misto: acidose metabólica + alcalose respiratória com AG aumentado', values: { ph: 7.39, pco2: 20, hco3Abg: 14, anionGap: computeAnionGap(140, 14, 104, NaN), oxygenationIndex: null }, expect: /acidose metabólica \+ alcalose respiratória/i },
+          { name: 'AG alto com HCO3 limítrofe aplica delta gap', values: { ph: 7.40, pco2: 41, hco3Abg: 22, anionGap: computeAnionGap(137, 22, 90, NaN), oxygenationIndex: null }, expect: /limítrofe[\s\S]*HCO₃⁻ corrigido pelo delta gap[\s\S]*Sugere alcalose metabólica associada/i },
+          { name: 'AG alto com HCO3 normal aplica delta gap', values: { ph: 7.40, pco2: 40, hco3Abg: 24, anionGap: computeAnionGap(140, 24, 90, NaN), oxygenationIndex: null }, expect: /HCO₃⁻ corrigido pelo delta gap[\s\S]*Sugere alcalose metabólica associada/i },
+          { name: 'Alcalose respiratória com AG alto também recebe delta gap', values: { ph: 7.50, pco2: 30, hco3Abg: 22, anionGap: computeAnionGap(140, 22, 90, NaN), oxygenationIndex: null }, expect: /alcalose respiratória aguda[\s\S]*ânion gap aumentado[\s\S]*HCO₃⁻ corrigido pelo delta gap/i },
+          { name: 'Acidemia com parâmetros limítrofes', values: { ph: 7.32, pco2: 45, hco3Abg: 23, anionGap: null, oxygenationIndex: null }, expect: /Acidemia com PCO₂/i },
+          { name: 'Alcalemia com parâmetros limítrofes', values: { ph: 7.48, pco2: 35, hco3Abg: 26, anionGap: null, oxygenationIndex: null }, expect: /Alcalemia com PCO₂/i }
+        ];
+
+        const clinicalResults = clinicalCases.map(function (testCase) {
+          const result = classifyAcidBase(testCase.values);
+          const output = buildOutputText(result);
+          return {
+            name: testCase.name,
+            passed: testCase.expect.test(output),
+            interpretation: result.interpretation,
+            output: output
+          };
+        });
+
+        const passed = maskResults.every(function (item) { return item.passed; }) &&
+          arithmeticResults.every(function (item) { return item.passed; }) &&
+          clinicalResults.every(function (item) { return item.passed; });
+
+        return { passed, maskResults, arithmeticResults, clinicalResults };
+      }
+
+      return Object.freeze({
+        constants: CONSTANTS,
+        parseLocaleNumber,
+        roundNumber,
+        formatNumber,
+        normalizePhInput,
+        normalizeTwoIntOneDecimal,
+        normalizeThreeIntOneDecimal,
+        normalizePco2Input,
+        normalizePao2Input,
+        normalizePmvaInput,
+        normalizeThreeIntOnly,
+        normalizeAlbuminInput,
+        normalizeAlbuminBlur,
+        normalizeFio2Input,
+        normalizeFio2Blur,
+        parseFio2Value,
+        normalizeFractionInput,
+        normalizeFractionBlur,
+        computeAnionGap,
+        computeOxygenationIndex,
+        getAnionGapDecisionValue,
+        describeAnionGap,
+        bicarbonateConsistencyWarning,
+        partialAnionGapDataMessage,
+        partialOxygenationDataMessage,
+        hendersonEstimatedPh,
+        collectCompatibilityAlerts,
+        getCompensationRanges,
+        deltaGapText,
+        buildSensitiveFindingsText,
+        classifyAcidBase,
+        buildOutputText,
+        runSelfTests
+      });
+    })();
+
+    const AcidBaseApp = (function (core) {
+      const AUTO_CALC_FIELDS = ['na', 'cl', 'albumin', 'pao2', 'fio2', 'pmva'];
+
+      const DOM = {
+        form: document.getElementById('acidBaseForm'),
+        output: document.getElementById('interp'),
+        status: document.getElementById('status'),
+        sensitiveBox: document.getElementById('sensitiveBox'),
+        alertBox: document.getElementById('alertBox'),
+        resultSection: document.getElementById('resultSection'),
+        calculateButton: document.getElementById('btnCalcular')
+      };
+
+      const APP_STATE = {
+        lastCalculationSucceeded: false,
+        lastCalculationHadAlerts: false
+      };
+
+      let LAST_HCO3_SOURCE = 'hco3';
+
+      function createValidationError(message, fields) {
+        return { type: 'validation', message: message, fields: fields || [] };
+      }
+
+      function setStatus(message, isError) {
+        DOM.status.textContent = message;
+        DOM.status.className = 'status ' + (isError ? 'error' : 'ok');
+      }
+
+      function clearFieldAlerts() {
+        DOM.form.querySelectorAll('.field-alert').forEach(function (element) {
+          element.classList.remove('field-alert');
+        });
+      }
+
+      function markFieldAlerts(fieldNames) {
+        clearFieldAlerts();
+        (fieldNames || []).forEach(function (fieldName) {
+          const field = DOM.form[fieldName];
+          if (field) field.classList.add('field-alert');
+        });
+      }
+
+      function showAlertMessages(messages, fieldNames) {
+        const validMessages = (messages || []).filter(Boolean);
+        markFieldAlerts(fieldNames || []);
+
+        if (!validMessages.length) {
+          DOM.alertBox.innerHTML = '';
+          DOM.alertBox.style.display = 'none';
+          return;
+        }
+
+        DOM.alertBox.innerHTML = '<ul><li>' + validMessages.join('</li><li>') + '</li></ul>';
+        DOM.alertBox.style.display = 'block';
+      }
+
+      function clearAlertMessages() {
+        clearFieldAlerts();
+        DOM.alertBox.innerHTML = '';
+        DOM.alertBox.style.display = 'none';
+      }
+
+      function escapeHtml(text) {
+        return String(text == null ? '' : text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function showSensitiveFindings(content) {
+        const text = String(content || '').trim();
+        if (!text) {
+          clearSensitiveFindings();
+          return;
+        }
+
+        const blocks = text.split(/\n\n+/).map(function (block) {
+          return '<div class="sensitive-block">' + escapeHtml(block).replace(/\n/g, '<br>') + '</div>';
+        }).join('');
+
+        DOM.sensitiveBox.innerHTML = '<h3>ACHADOS SENSÍVEIS / ALERTAS CLÍNICOS</h3>' + blocks;
+        DOM.sensitiveBox.style.display = 'block';
+      }
+
+      function clearSensitiveFindings() {
+        DOM.sensitiveBox.innerHTML = '';
+        DOM.sensitiveBox.style.display = 'none';
+      }
+
+      function scrollToResult() {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+          document.activeElement.blur();
+        }
+
+        const performScroll = function () {
+          const rect = DOM.resultSection.getBoundingClientRect();
+          const absoluteTop = window.pageYOffset + rect.top - 12;
+
+          window.scrollTo({
+            top: absoluteTop < 0 ? 0 : absoluteTop,
+            behavior: 'smooth'
+          });
+        };
+
+        requestAnimationFrame(function () {
+          performScroll();
+          setTimeout(performScroll, 260);
+        });
+      }
+
+      function readValue(name) {
+        return core.parseLocaleNumber(DOM.form[name].value);
+      }
+
+      function readFio2Value() {
+        return core.parseFio2Value(DOM.form.fio2.value);
+      }
+
+      function syncBicarbonateFields(sourceName) {
+        const source = DOM.form[sourceName];
+        const targetName = sourceName === 'bicarb' ? 'hco3' : 'bicarb';
+        const target = DOM.form[targetName];
+
+        if (!source || !target) return;
+        LAST_HCO3_SOURCE = sourceName;
+
+        if (target.value !== source.value) {
+          target.value = source.value;
+        }
+      }
+
+      function syncBicarbonateValues() {
+        if (DOM.form[LAST_HCO3_SOURCE] && DOM.form[LAST_HCO3_SOURCE].value.trim() !== '') {
+          syncBicarbonateFields(LAST_HCO3_SOURCE);
+          return;
+        }
+
+        if (DOM.form.hco3.value.trim() !== '') {
+          syncBicarbonateFields('hco3');
+          return;
+        }
+
+        if (DOM.form.bicarb.value.trim() !== '') {
+          syncBicarbonateFields('bicarb');
+        }
+      }
+
+      function syncBicarbonateFromGasometry() {
+        syncBicarbonateValues();
+      }
+
+      function updateAppState(success, hasAlerts) {
+        APP_STATE.lastCalculationSucceeded = !!success;
+        APP_STATE.lastCalculationHadAlerts = !!hasAlerts;
+      }
+
+      function getFormValues() {
+        syncBicarbonateFromGasometry();
+
+        return {
+          ph: readValue('ph'),
+          pco2: readValue('pco2'),
+          hco3Abg: readValue('hco3'),
+          na: readValue('na'),
+          hco3Bio: readValue('bicarb'),
+          cl: readValue('cl'),
+          albumin: readValue('albumin'),
+          pao2: readValue('pao2'),
+          fio2: readFio2Value(),
+          fio2Raw: DOM.form.fio2.value,
+          pmva: readValue('pmva')
+        };
+      }
+
+      function validateCoreInputs(values) {
+        if (!Number.isFinite(values.ph) || values.ph <= 0) {
+          throw createValidationError('Digite um valor válido para o pH.', ['ph']);
+        }
+
+        if (!Number.isFinite(values.pco2) || values.pco2 <= 0) {
+          throw createValidationError('Digite um valor válido para a PCO₂.', ['pco2']);
+        }
+
+        if (!Number.isFinite(values.hco3Abg) || values.hco3Abg <= 0) {
+          throw createValidationError('Digite um valor válido para o HCO₃⁻.', ['hco3']);
+        }
+
+        if (values.ph < core.constants.PH_MIN || values.ph > core.constants.PH_MAX) {
+          throw createValidationError('pH fora de faixa plausível para interpretação automática.', ['ph']);
+        }
+
+        if (values.pco2 < core.constants.PCO2_MIN || values.pco2 > core.constants.PCO2_MAX) {
+          throw createValidationError('PCO₂ fora de faixa plausível para interpretação automática.', ['pco2']);
+        }
+
+        if (values.hco3Abg < core.constants.HCO3_MIN || values.hco3Abg > core.constants.HCO3_MAX) {
+          throw createValidationError('HCO₃⁻ fora de faixa plausível para interpretação automática.', ['hco3']);
+        }
+      }
+
+      function applyInputFormatter(fieldName, inputFormatter, blurFormatter) {
+        const field = DOM.form[fieldName];
+        if (!field) return;
+
+        field.addEventListener('input', function () {
+          const formatted = inputFormatter(field.value);
+          if (field.value !== formatted) field.value = formatted;
+        });
+
+        field.addEventListener('blur', function () {
+          const formatter = blurFormatter || inputFormatter;
+          const formatted = formatter(field.value);
+          if (field.value !== formatted) field.value = formatted;
+        });
+      }
+
+      function bindFormatting() {
+        applyInputFormatter('ph', core.normalizePhInput);
+        applyInputFormatter('pco2', core.normalizePco2Input);
+        applyInputFormatter('hco3', core.normalizeTwoIntOneDecimal);
+        applyInputFormatter('bicarb', core.normalizeTwoIntOneDecimal);
+        applyInputFormatter('na', core.normalizeThreeIntOnly);
+        applyInputFormatter('cl', core.normalizeThreeIntOnly);
+        applyInputFormatter('albumin', core.normalizeAlbuminInput, core.normalizeAlbuminBlur);
+        applyInputFormatter('pao2', core.normalizePao2Input);
+        applyInputFormatter('fio2', core.normalizeFio2Input, core.normalizeFio2Blur);
+        applyInputFormatter('pmva', core.normalizePmvaInput);
+      }
+
+      function fillAnionGapField(anionGap) {
+        if (!anionGap) {
+          DOM.form.agap.value = '';
+          return;
+        }
+
+        const displayValue = Number.isFinite(anionGap.corrected) ? anionGap.corrected : anionGap.measured;
+        DOM.form.agap.value = core.formatNumber(core.roundNumber(displayValue, 1), 1);
+      }
+
+      function fillOxygenationIndexField(oxygenationIndex) {
+        DOM.form.oi.value = oxygenationIndex == null
+          ? ''
+          : core.formatNumber(core.roundNumber(oxygenationIndex, 1), 1);
+      }
+
+      function getAutoDerivedValues() {
+        return {
+          anionGap: core.computeAnionGap(
+            readValue('na'),
+            readValue('bicarb'),
+            readValue('cl'),
+            readValue('albumin')
+          ),
+          oxygenationIndex: core.computeOxygenationIndex(
+            readValue('pmva'),
+            readFio2Value(),
+            readValue('pao2')
+          )
+        };
+      }
+
+      function updateAutoCalculatedFields() {
+        syncBicarbonateFromGasometry();
+        const derived = getAutoDerivedValues();
+        fillAnionGapField(derived.anionGap);
+        fillOxygenationIndexField(derived.oxygenationIndex);
+      }
+
+      function calculate() {
+        try {
+          clearAlertMessages();
+          clearSensitiveFindings();
+
+          const values = getFormValues();
+          updateAutoCalculatedFields();
+          validateCoreInputs(values);
+          values.anionGap = core.computeAnionGap(values.na, values.hco3Bio, values.cl, values.albumin);
+          values.oxygenationIndex = core.computeOxygenationIndex(values.pmva, values.fio2, values.pao2);
+
+          const compatibility = core.collectCompatibilityAlerts(values);
+          const result = core.classifyAcidBase(values);
+
+          DOM.output.value = core.buildOutputText(result);
+          showSensitiveFindings(result.sensitiveFindingsText);
+          showAlertMessages(compatibility.messages, compatibility.fields);
+
+          updateAppState(true, compatibility.messages.length > 0);
+          setStatus(
+            compatibility.messages.length
+              ? 'Cálculo concluído com alertas de compatibilidade.'
+              : 'Cálculo concluído.',
+            false
+          );
+
+          scrollToResult();
+        } catch (error) {
+          DOM.output.value = '';
+          clearSensitiveFindings();
+          updateAutoCalculatedFields();
+
+          if (error && error.type === 'validation') {
+            updateAppState(false, true);
+            showAlertMessages([error.message], error.fields || []);
+            setStatus(error.message, true);
+            scrollToResult();
+            return;
+          }
+
+          updateAppState(false, true);
+          showAlertMessages(['Falha inesperada ao calcular. Revise os dados informados.'], []);
+          setStatus('Falha inesperada ao calcular.', true);
+          scrollToResult();
+        }
+      }
+
+      function resetState() {
+        setTimeout(function () {
+          DOM.output.value = '';
+          DOM.form.agap.value = '';
+          DOM.form.oi.value = '';
+          clearSensitiveFindings();
+          clearAlertMessages();
+          updateAppState(false, false);
+          LAST_HCO3_SOURCE = 'hco3';
+          setStatus('Campos limpos.', false);
+        }, 0);
+      }
+
+      function bindAutoCalculationEvents() {
+        ['hco3', 'bicarb'].forEach(function (fieldName) {
+          DOM.form[fieldName].addEventListener('input', function () {
+            syncBicarbonateFields(fieldName);
+            updateAutoCalculatedFields();
+          });
+
+          DOM.form[fieldName].addEventListener('blur', function () {
+            syncBicarbonateFields(fieldName);
+            updateAutoCalculatedFields();
+          });
+        });
+
+        AUTO_CALC_FIELDS.forEach(function (fieldName) {
+          DOM.form[fieldName].addEventListener('input', updateAutoCalculatedFields);
+          DOM.form[fieldName].addEventListener('blur', updateAutoCalculatedFields);
+        });
+      }
+
+      function bindMainEvents() {
+        DOM.calculateButton.addEventListener('click', calculate);
+
+        DOM.form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          calculate();
+        });
+
+        DOM.form.addEventListener('reset', resetState);
+      }
+
+      function init() {
+        bindFormatting();
+        bindMainEvents();
+        bindAutoCalculationEvents();
+
+        // Executa autotestes internos sem interferir na interface do usuário.
+        // Testes complementares atualizados ficam registrados em TESTES_CORE_CDAB.json.
+        core.runSelfTests();
+      }
+
+      return Object.freeze({
+        init,
+        calculate,
+        resetState,
+        getFormValues,
+        updateAutoCalculatedFields
+      });
+    })(AcidBaseCore);
+
+    window.AcidBaseCore = AcidBaseCore;
+    window.AcidBaseApp = AcidBaseApp;
+
+    AcidBaseApp.init();
+    AcidBaseApp.updateAutoCalculatedFields();
+
+  </script>
+</body>
+</html>
+
+<!-- test writable -->
