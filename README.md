@@ -1,2 +1,2 @@
 # cdab
-Ferramenta para avaliação de distúrbios acidobase
+Ferramenta para avaliação de distúrbios ácido-base
