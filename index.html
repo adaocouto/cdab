@@ -1040,6 +1040,15 @@
         const findings = [];
         const anionGapValue = getAnionGapDecisionValue(values.anionGap);
         const ranges = getCompensationRanges(values.pco2, values.hco3Abg);
+        const interpretationText = String(interpretation || '');
+        const hasMetabolicAcidosisPattern =
+          (Number.isFinite(values.hco3Abg) && values.hco3Abg < CONSTANTS.HCO3_NORMAL_MIN) ||
+          (Number.isFinite(values.hco3Bio) && values.hco3Bio < CONSTANTS.HCO3_NORMAL_MIN) ||
+          /acidose metabólica/i.test(interpretationText);
+        const hasMetabolicAlkalosisPattern =
+          (Number.isFinite(values.hco3Abg) && values.hco3Abg > CONSTANTS.HCO3_NORMAL_MAX) ||
+          (Number.isFinite(values.hco3Bio) && values.hco3Bio > CONSTANTS.HCO3_NORMAL_MAX) ||
+          /alcalose metabólica/i.test(interpretationText);
 
         if (Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER) {
           const deltaAg = anionGapValue - CONSTANTS.AG_BASELINE;
@@ -1064,9 +1073,21 @@
           else if (correctedHco3 > 26) lines.push('Achado sensível: HCO₃⁻ corrigido pelo delta gap acima de 26 mEq/L. Pode sugerir alcalose metabólica associada leve, se compatível com o contexto clínico.');
           else if (correctedHco3 < 22) lines.push('Achado forte: HCO₃⁻ corrigido pelo delta gap < 22 mEq/L. Sugere acidose metabólica hiperclorêmica associada.');
 
+          lines.push('Orientação etiológica para ânion gap elevado: investigar consumo de bases por ácidos não mensuráveis. Mnemônico GOLDMARK/MUDPILES: glicóis, oxoprolina, lactato, D-lactato, metanol, aspirina/salicilatos, insuficiência renal/uremia e cetoacidose.');
+
           findings.push(lines.join('\n'));
         } else if (Number.isFinite(anionGapValue)) {
+          if (hasMetabolicAcidosisPattern) {
+            findings.push('Acidose metabólica com ânion gap normal: sugerir perdas digestivas de bicarbonato, como diarreia ou fístulas, ou acidoses tubulares renais (RTA).');
+          }
+
           findings.push('Nota sobre o ânion gap: a referência de normalidade pressupõe fosfato sérico dentro da normalidade. Hipofosfatemia importante pode reduzir o ânion gap basal e mascarar elevação discreta de ânions não mensurados.');
+        }
+
+        if (hasMetabolicAlkalosisPattern) {
+          findings.push(
+            'Alcalose metabólica — orientação etiológica: avaliar o cloro urinário para diferenciar causas cloro-responsivas, como vômitos e uso recente de diuréticos, de causas cloro-resistentes, como hiperaldosteronismo.'
+          );
         }
 
         if (Number.isFinite(values.hco3Abg) && values.hco3Abg > CONSTANTS.HCO3_NORMAL_MAX && Number.isFinite(values.pco2)) {
@@ -1380,9 +1401,18 @@
           const chronicRespAlkDistance = rangeDistance(values.hco3Abg, ranges.respAlkChronic);
           const agElevated = Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER;
           const belowRespAlkFloor = values.hco3Abg < CONSTANTS.RESP_ALK_HCO3_FLOOR;
-          const likelyPureChronicRespAlkosis = values.ph > 7.40 && chronicRespAlkDistance <= 2 && !belowRespAlkFloor;
+          const neutralPhWithDualLowAbnormalities =
+            Number.isFinite(values.ph) && Math.abs(values.ph - 7.40) <= 0.01;
+          const likelyPureChronicRespAlkosis = values.ph > 7.40 && chronicRespAlkDistance <= 2 && !belowRespAlkFloor && !neutralPhWithDualLowAbnormalities;
 
-          if (belowRespAlkFloor) {
+          if (neutralPhWithDualLowAbnormalities) {
+            interpretation = 'Distúrbio misto: acidose metabólica + alcalose respiratória';
+            interpretation += Number.isFinite(anionGapValue)
+              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
+              : '.';
+            interpretation += '\npH em torno de 7,40 com HCO₃⁻ baixo e PCO₂ baixa: não classificar como compensação respiratória adequada isolada, mesmo se a PCO₂ cair dentro da faixa de Winter.';
+            compensationInfo = expected.winter + '\n' + expected.respAlk;
+          } else if (belowRespAlkFloor) {
             interpretation = 'Distúrbio misto: alcalose respiratória + acidose metabólica associada';
             interpretation += Number.isFinite(anionGapValue)
               ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
@@ -1620,8 +1650,8 @@
           { name: 'Delta gap simplificado sem sugestão hiperclorêmica duplicada', passed: duplicateDeltaMatches.length === 0 },
           { name: 'Delta gap não roda com AG baixo', passed: deltaGapText(24, 3) === '' },
           { name: 'Cloro corrigido detecta hipocloremia apenas aparente por hiponatremia', passed: /não interpretar como hipocloremia primária/i.test(buildChlorideCorrectionText(115, 85, 20)) },
-          { name: 'Cloro corrigido detecta pseudohipercloremia por hipernatremia', passed: /aparentemente elevado[\s\S]*cloro corrigido é normal/i.test(buildChlorideCorrectionText(165, 125, 24)) },
-          { name: 'Alerta de pseudohipercloremia por hipernatremia', passed: collectCompatibilityAlerts({ ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 24, na: 165, cl: 125, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /Cloro aparentemente elevado/.test(message); }) },
+          { name: 'Cloro corrigido detecta pseudohipercloremia por hipernatremia', passed: /aparentemente elevado[\s\S]*cloro corrigido é normal/i.test(buildChlorideCorrectionText(165, 124, 24)) },
+          { name: 'Alerta de pseudohipercloremia por hipernatremia', passed: collectCompatibilityAlerts({ ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 24, na: 165, cl: 124, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /Cloro aparentemente elevado/.test(message); }) },
           { name: 'Alcalose metabólica com PCO2 >55 dispara alerta de teto fisiológico', passed: collectCompatibilityAlerts({ ph: 7.56, pco2: 58, hco3Abg: 50, hco3Bio: 50, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /teto usual de hipoventilação compensatória/.test(message); }) },
           { name: 'pH extremo abaixo de 6,8 dispara alerta de baixa precisão', passed: collectCompatibilityAlerts({ ph: 6.65, pco2: 110, hco3Abg: 8, hco3Bio: 8, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /zona de baixa precisão/.test(message); }) },
           { name: 'Resp acidosis acute strict center±1 at PCO2 60 -> 25 a 27', passed: roundNumber(respRanges.respAcidAcute[0], 1) === 25.0 && roundNumber(respRanges.respAcidAcute[1], 1) === 27.0 },
@@ -1640,6 +1670,7 @@
         const clinicalCases = [
           { name: 'Gasometria normal', values: { ph: 7.40, pco2: 40, hco3Abg: 24, anionGap: null, oxygenationIndex: null }, expect: /sem distúrbio ácido-base evidente/i },
           { name: 'Acidose metabólica com compensação adequada', values: { ph: 7.28, pco2: 26, hco3Abg: 12, anionGap: computeAnionGap(140, 12, 120, 2.0), oxygenationIndex: null }, expect: /acidose metabólica primária/i },
+          { name: 'pH 7,40 com HCO3 baixo e PCO2 baixa é misto mesmo na faixa de Winter', values: { ph: 7.40, pco2: 30.5, hco3Abg: 15, anionGap: computeAnionGap(140, 15, 112, NaN), oxygenationIndex: null }, expect: /Distúrbio misto: acidose metabólica \+ alcalose respiratória[\s\S]*não classificar como compensação respiratória adequada isolada/i },
           { name: 'Alcalose metabólica compensada', values: { ph: 7.52, pco2: 48, hco3Abg: 38, anionGap: null, oxygenationIndex: null }, expect: /alcalose metabólica primária/i },
           { name: 'Acidose respiratória aguda', values: { ph: 7.25, pco2: 60, hco3Abg: 26, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória aguda/i },
           { name: 'Acidose respiratória crônica agudizada ou compensação em andamento', values: { ph: 7.29, pco2: 60, hco3Abg: 29, anionGap: null, oxygenationIndex: null }, expect: /crônica agudizada/i },
@@ -1652,6 +1683,9 @@
           { name: 'Distúrbio misto: acidose metabólica + alcalose respiratória com AG aumentado', values: { ph: 7.39, pco2: 20, hco3Abg: 14, anionGap: computeAnionGap(140, 14, 104, NaN), oxygenationIndex: null }, expect: /acidose metabólica \+ alcalose respiratória/i },
           { name: 'AG alto com HCO3 limítrofe aplica delta gap', values: { ph: 7.40, pco2: 41, hco3Abg: 22, anionGap: computeAnionGap(137, 22, 90, NaN), oxygenationIndex: null }, expect: /limítrofe[\s\S]*HCO₃⁻ corrigido pelo delta gap[\s\S]*Sugere alcalose metabólica associada/i },
           { name: 'AG alto com HCO3 normal indica alcalose metabólica concomitante', values: { ph: 7.40, pco2: 40, hco3Abg: 24, anionGap: computeAnionGap(140, 24, 90, NaN), oxygenationIndex: null }, expect: /alcalose metabólica concomitante/i },
+          { name: 'AG alto sugere GOLDMARK/MUDPILES', values: { ph: 7.25, pco2: 26, hco3Abg: 12, anionGap: computeAnionGap(140, 12, 100, NaN), oxygenationIndex: null }, expect: /GOLDMARK\/MUDPILES[\s\S]*lactato[\s\S]*cetoacidose/i },
+          { name: 'Acidose metabólica com AG normal sugere perdas digestivas ou RTA', values: { ph: 7.28, pco2: 28, hco3Abg: 14, anionGap: computeAnionGap(140, 14, 116, NaN), oxygenationIndex: null }, expect: /ânion gap normal[\s\S]*perdas digestivas de bicarbonato[\s\S]*RTA/i },
+          { name: 'Alcalose metabólica sugere cloro urinário', values: { ph: 7.52, pco2: 48, hco3Abg: 38, anionGap: null, oxygenationIndex: null }, expect: /cloro urinário[\s\S]*cloro-responsivas[\s\S]*cloro-resistentes/i },
           { name: 'Alcalose respiratória com AG alto também recebe delta gap', values: { ph: 7.50, pco2: 30, hco3Abg: 22, anionGap: computeAnionGap(140, 22, 90, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /alcalose respiratória aguda[\s\S]*ânion gap aumentado[\s\S]*HCO₃⁻ corrigido pelo delta gap/i },
           { name: 'Alcalose respiratória com HCO3 abaixo de 12 vira distúrbio misto', values: { ph: 7.55, pco2: 15, hco3Abg: 10, anionGap: computeAnionGap(140, 10, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /alcalose respiratória \+ acidose metabólica associada/i },
           { name: 'Acidemia com parâmetros limítrofes', values: { ph: 7.32, pco2: 45, hco3Abg: 23, anionGap: null, oxygenationIndex: null }, expect: /Acidemia com PCO₂/i },
