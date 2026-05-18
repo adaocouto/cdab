@@ -648,7 +648,7 @@
         return String(value == null ? '' : value).replace(/,$/, '');
       }
 
-      function normalizePco2Input(value) {
+      function normalizeFourDigitDecimalInput(value) {
         const original = String(value == null ? '' : value)
           .trim()
           .replace(/\s+/g, '')
@@ -661,30 +661,22 @@
         if (commaIndex !== -1) {
           const integerPart = (original.slice(0, commaIndex).replace(/^0+(?=\d)/, '') || '0')
             .replace(/\D/g, '')
-            .slice(0, 3) || '0';
+            .slice(0, 4) || '0';
+          const remainingDigits = Math.max(0, 4 - integerPart.length);
           const decimalPart = original.slice(commaIndex + 1)
             .replace(/\D/g, '')
-            .slice(0, 1);
+            .slice(0, remainingDigits);
           return integerPart + ',' + decimalPart;
         }
 
-        const digits = original.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
+        const digits = (original.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0').slice(0, 4);
         if (digits.length <= 2) return digits;
 
-        if (digits.length === 3) {
-          const integerValue = Number(digits);
-          if (integerValue <= CONSTANTS.PCO2_MAX || integerValue < 200) return digits;
-          return digits.slice(0, 2) + ',' + digits.slice(2, 3);
-        }
+        return digits.slice(0, -1) + ',' + digits.slice(-1);
+      }
 
-        const firstThreeDigits = digits.slice(0, 3);
-        const firstThreeValue = Number(firstThreeDigits);
-
-        if (firstThreeValue <= 199) {
-          return firstThreeDigits + ',' + digits.slice(3, 4);
-        }
-
-        return digits.slice(0, 2) + ',' + digits.slice(2, 3);
+      function normalizePco2Input(value) {
+        return normalizeFourDigitDecimalInput(value);
       }
 
       function normalizePco2Blur(value) {
@@ -692,7 +684,7 @@
       }
 
       function normalizeHco3Input(value) {
-        return normalizeDecimalInputPreservingSeparator(value, 2, 1, true);
+        return normalizeFourDigitDecimalInput(value);
       }
 
       function normalizeHco3Blur(value) {
@@ -870,8 +862,8 @@
 
       function classifyPao2Fio2Ratio(ratio) {
         if (!Number.isFinite(ratio)) return '';
-        if (ratio < 100) return 'SDRA grave pela relação P/F (<100), se contexto clínico e critérios de SDRA estiverem presentes';
-        if (ratio < 200) return 'SDRA moderada pela relação P/F (<200), se contexto clínico e critérios de SDRA estiverem presentes';
+        if (ratio <= 100) return 'SDRA grave pela relação P/F (≤100), se contexto clínico e critérios de SDRA estiverem presentes';
+        if (ratio <= 200) return 'SDRA moderada pela relação P/F (≤200), se contexto clínico e critérios de SDRA estiverem presentes';
         if (ratio < 300) return 'SDRA leve pela relação P/F (<300), se contexto clínico e critérios de SDRA estiverem presentes';
         return 'sem critério de hipoxemia para SDRA pela relação P/F isolada (≥300)';
       }
@@ -993,15 +985,19 @@
           winterCenter + 2
         ];
 
-        const metabolicAlkalosisRawCenter = (0.7 * hco3) + 20;
-        const metabolicAlkalosisCenter = Math.min(
-          metabolicAlkalosisRawCenter,
+        const metabolicAlkalosisDeltaHco3 = hco3 - 24;
+        const metabolicAlkalosisRawLow = 40 + (0.6 * metabolicAlkalosisDeltaHco3);
+        const metabolicAlkalosisRawHigh = 40 + (0.75 * metabolicAlkalosisDeltaHco3);
+        const metabolicAlkalosisRawCenter = (metabolicAlkalosisRawLow + metabolicAlkalosisRawHigh) / 2;
+        const metabolicAlkalosisLow = Math.min(
+          Math.max(metabolicAlkalosisRawLow, 0),
           CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING
         );
-        const metabolicAlkalosis = [
-          Math.max(metabolicAlkalosisCenter - 2, 0),
-          Math.min(metabolicAlkalosisCenter + 2, CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING)
-        ];
+        const metabolicAlkalosisHigh = Math.min(
+          Math.max(metabolicAlkalosisRawHigh, metabolicAlkalosisLow),
+          CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING
+        );
+        const metabolicAlkalosis = [metabolicAlkalosisLow, metabolicAlkalosisHigh];
 
         const deltaRespAcid = (pco2 - 40) / 10;
         const respAcidAcuteRawCenter = 24 + (1 * deltaRespAcid);
@@ -1037,6 +1033,8 @@
           winterPco2Floor: CONSTANTS.WINTER_PCO2_FLOOR,
           metabolicAlkalosis,
           metabolicAlkalosisRawCenter,
+          metabolicAlkalosisRawLow,
+          metabolicAlkalosisRawHigh,
           metabolicAlkalosisCeiling: CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING,
           respAcidAcute,
           respAcidChronic,
@@ -1169,6 +1167,12 @@
       function collectCompatibilityAlerts(values) {
         const messages = [];
         const fields = new Set();
+        const rangesForAlerts = getCompensationRanges(values.pco2, values.hco3Abg);
+        const likelyCompensatedChronicRespAcidosis =
+          Number.isFinite(values.ph) && values.ph < 7.40 &&
+          Number.isFinite(values.pco2) && values.pco2 > CONSTANTS.PCO2_NORMAL_MAX &&
+          Number.isFinite(values.hco3Abg) &&
+          rangeDistance(values.hco3Abg, rangesForAlerts.respAcidChronic) <= 2;
 
         if (Number.isFinite(values.ph) && (values.ph < CONSTANTS.PH_FORMULA_ACCURACY_MIN || values.ph > CONSTANTS.PH_FORMULA_ACCURACY_MAX)) {
           messages.push(
@@ -1181,7 +1185,8 @@
 
         if (
           Number.isFinite(values.hco3Abg) && values.hco3Abg > CONSTANTS.HCO3_NORMAL_MAX &&
-          Number.isFinite(values.pco2) && values.pco2 > CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING
+          Number.isFinite(values.pco2) && values.pco2 > CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING &&
+          !likelyCompensatedChronicRespAcidosis
         ) {
           messages.push(
             'PCO₂ acima de ' + formatNumber(CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING, 0) +
@@ -1360,11 +1365,13 @@
             'PCO₂ esperada: ' +
             formatNumber(roundNumber(ranges.metabolicAlkalosis[0], 1), 1) + ' a ' +
             formatNumber(roundNumber(ranges.metabolicAlkalosis[1], 1), 1) +
-            ' mmHg (teto fisiológico de compensação ≈ ' +
+            ' mmHg [40 + 0,6 a 0,75 × (HCO₃⁻ − 24); teto fisiológico de compensação ≈ ' +
             formatNumber(roundNumber(ranges.metabolicAlkalosisCeiling, 0), 0) + ' mmHg' +
-            (ranges.metabolicAlkalosisRawCenter > ranges.metabolicAlkalosisCeiling
-              ? '; valor linear bruto seria ≈ ' + formatNumber(roundNumber(ranges.metabolicAlkalosisRawCenter, 1), 1) + ' mmHg'
-              : '') + ')',
+            (ranges.metabolicAlkalosisRawHigh > ranges.metabolicAlkalosisCeiling
+              ? '; faixa linear bruta seria ≈ ' +
+                formatNumber(roundNumber(ranges.metabolicAlkalosisRawLow, 1), 1) + ' a ' +
+                formatNumber(roundNumber(ranges.metabolicAlkalosisRawHigh, 1), 1) + ' mmHg'
+              : '') + ']',
 
           respAcid:
             'HCO₃⁻ esperado no quadro agudo: ' +
@@ -1647,14 +1654,19 @@
           { name: 'PCO2 28, preserva separador durante digitação', actual: normalizePco2Input('28,'), expect: '28,' },
           { name: 'PCO2 280 -> 28,0 com vírgula automática', actual: normalizePco2Input('280'), expect: '28,0' },
           { name: 'PCO2 450 -> 45,0 com vírgula automática', actual: normalizePco2Input('450'), expect: '45,0' },
-          { name: 'PCO2 100 -> 100 preservado como valor inteiro plausível', actual: normalizePco2Input('100'), expect: '100' },
+          { name: 'PCO2 100 -> 10,0 com máscara decimal automática', actual: normalizePco2Input('100'), expect: '10,0' },
           { name: 'PCO2 1005 -> 100,5 com vírgula automática', actual: normalizePco2Input('1005'), expect: '100,5' },
-          { name: 'PCO2 151 -> 151 para validação, sem conversão silenciosa', actual: normalizePco2Input('151'), expect: '151' },
+          { name: 'PCO2 10056 limita para 4 dígitos numéricos', actual: normalizePco2Input('10056'), expect: '100,5' },
+          { name: 'PCO2 151 -> 15,1 com máscara decimal automática', actual: normalizePco2Input('151'), expect: '15,1' },
+          { name: 'PCO2 12,34 permite 4 dígitos numéricos sem contar a vírgula', actual: normalizePco2Input('12,34'), expect: '12,34' },
           { name: 'PaO2 701 -> 701 para validação, sem conversão silenciosa', actual: normalizePao2Input('701'), expect: '701' },
           { name: 'PMVA 120 preservado como valor inserido', actual: normalizePmvaInput('120'), expect: '120' },
           { name: 'HCO3 140 -> 14,0', actual: normalizeHco3Input('140'), expect: '14,0' },
           { name: 'HCO3 14.5 convertido para vírgula', actual: normalizeHco3Input('14.5'), expect: '14,5' },
           { name: 'HCO3 14, preserva separador durante digitação', actual: normalizeHco3Input('14,'), expect: '14,' },
+          { name: 'HCO3 14,56 permite 4 dígitos numéricos sem contar a vírgula', actual: normalizeHco3Input('14,56'), expect: '14,56' },
+          { name: 'HCO3 1456 -> 145,6 com limite de 4 dígitos numéricos', actual: normalizeHco3Input('1456'), expect: '145,6' },
+          { name: 'HCO3 14567 limita para 4 dígitos numéricos', actual: normalizeHco3Input('14567'), expect: '145,6' },
           { name: 'Na 140 -> 140', actual: normalizeThreeIntOnly('140'), expect: '140' },
           { name: 'Albumina 44 -> 4,4', actual: normalizeAlbuminBlur('44'), expect: '4,4' },
           { name: 'FiO2 021 -> 0,21', actual: normalizeFio2Blur('021'), expect: '0,21' },
@@ -1676,6 +1688,7 @@
           { name: 'IO = (12 × 0,40 × 100) / 80 = 6,0', passed: roundNumber(computeOxygenationIndex(12, 0.40, 80), 1) === 6.0 },
           { name: 'Relação P/F = 80 / 0,40 = 200', passed: roundNumber(computePao2Fio2Ratio(80, 0.40), 0) === 200 },
           { name: 'Relação P/F 90 classifica SDRA grave', passed: /grave/.test(classifyPao2Fio2Ratio(90)) },
+          { name: 'Relação P/F 200 classifica SDRA moderada', passed: /moderada/.test(classifyPao2Fio2Ratio(200)) },
           { name: 'FiO2 40% é convertido para 0,40', passed: roundNumber(parseFio2Value('40'), 2) === 0.40 },
           { name: 'FiO2 2 é inválida, não 0,02', passed: Number.isNaN(parseFio2Value('2')) },
           { name: 'PMVA 120 permanece 120 e gera alerta de plausibilidade', passed: /PMVA fora da faixa plausível/.test(partialOxygenationDataMessage(100, 0.40, 120, '0,40')) },
@@ -1923,7 +1936,7 @@
         if (!source || !target) return;
         LAST_HCO3_SOURCE = sourceName;
 
-        if (target.value !== source.value) {
+        if (source.value.trim() !== '' && target.value.trim() === '') {
           target.value = source.value;
         }
       }
@@ -1997,13 +2010,73 @@
         }
       }
 
+      function countDigits(text) {
+        return String(text == null ? '' : text).replace(/\D/g, '').length;
+      }
+
+      function getCaretIntent(rawValue, cursorPosition) {
+        const prefix = String(rawValue == null ? '' : rawValue)
+          .slice(0, Number.isFinite(cursorPosition) ? cursorPosition : 0)
+          .replace(/\./g, ',');
+        const separatorIndex = prefix.indexOf(',');
+
+        if (separatorIndex !== -1) {
+          return {
+            hasSeparator: true,
+            integerDigits: countDigits(prefix.slice(0, separatorIndex)),
+            decimalDigits: countDigits(prefix.slice(separatorIndex + 1))
+          };
+        }
+
+        return {
+          hasSeparator: false,
+          totalDigits: countDigits(prefix)
+        };
+      }
+
+      function findCaretPositionByDigitCount(formattedValue, digitCount) {
+        if (!digitCount) return 0;
+
+        let seen = 0;
+        for (let index = 0; index < formattedValue.length; index += 1) {
+          if (/\d/.test(formattedValue.charAt(index))) {
+            seen += 1;
+            if (seen >= digitCount) return index + 1;
+          }
+        }
+
+        return formattedValue.length;
+      }
+
+      function findCaretPosition(formattedValue, intent) {
+        const commaIndex = formattedValue.indexOf(',');
+
+        if (intent && intent.hasSeparator && commaIndex !== -1) {
+          const decimalPart = formattedValue.slice(commaIndex + 1);
+          return commaIndex + 1 + Math.min(intent.decimalDigits, countDigits(decimalPart));
+        }
+
+        return findCaretPositionByDigitCount(formattedValue, intent ? intent.totalDigits : 0);
+      }
+
       function applyInputFormatter(fieldName, inputFormatter, blurFormatter) {
         const field = DOM.form[fieldName];
         if (!field) return;
 
         field.addEventListener('input', function () {
-          const formatted = inputFormatter(field.value);
-          if (field.value !== formatted) field.value = formatted;
+          const rawValue = field.value;
+          const cursorPosition = field.selectionStart;
+          const intent = getCaretIntent(rawValue, cursorPosition);
+          const formatted = inputFormatter(rawValue);
+
+          if (rawValue !== formatted) {
+            field.value = formatted;
+
+            if (document.activeElement === field && typeof field.setSelectionRange === 'function') {
+              const newPosition = findCaretPosition(formatted, intent);
+              field.setSelectionRange(newPosition, newPosition);
+            }
+          }
         });
 
         field.addEventListener('blur', function () {
