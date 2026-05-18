@@ -649,7 +649,42 @@
       }
 
       function normalizePco2Input(value) {
-        return normalizeDecimalInputPreservingSeparator(value, 4, 1, false);
+        const original = String(value == null ? '' : value)
+          .trim()
+          .replace(/\s+/g, '')
+          .replace(/\./g, ',')
+          .replace(/[^\d,]/g, '');
+
+        if (!original) return '';
+
+        const commaIndex = original.indexOf(',');
+        if (commaIndex !== -1) {
+          const integerPart = (original.slice(0, commaIndex).replace(/^0+(?=\d)/, '') || '0')
+            .replace(/\D/g, '')
+            .slice(0, 3) || '0';
+          const decimalPart = original.slice(commaIndex + 1)
+            .replace(/\D/g, '')
+            .slice(0, 1);
+          return integerPart + ',' + decimalPart;
+        }
+
+        const digits = original.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
+        if (digits.length <= 2) return digits;
+
+        if (digits.length === 3) {
+          const integerValue = Number(digits);
+          if (integerValue <= CONSTANTS.PCO2_MAX || integerValue < 200) return digits;
+          return digits.slice(0, 2) + ',' + digits.slice(2, 3);
+        }
+
+        const firstThreeDigits = digits.slice(0, 3);
+        const firstThreeValue = Number(firstThreeDigits);
+
+        if (firstThreeValue <= 199) {
+          return firstThreeDigits + ',' + digits.slice(3, 4);
+        }
+
+        return digits.slice(0, 2) + ',' + digits.slice(2, 3);
       }
 
       function normalizePco2Blur(value) {
@@ -1610,7 +1645,10 @@
           { name: 'PCO2 28,5 preservado', actual: normalizePco2Input('28,5'), expect: '28,5' },
           { name: 'PCO2 28.5 convertido para vírgula', actual: normalizePco2Input('28.5'), expect: '28,5' },
           { name: 'PCO2 28, preserva separador durante digitação', actual: normalizePco2Input('28,'), expect: '28,' },
-          { name: 'PCO2 100 -> 100', actual: normalizePco2Input('100'), expect: '100' },
+          { name: 'PCO2 280 -> 28,0 com vírgula automática', actual: normalizePco2Input('280'), expect: '28,0' },
+          { name: 'PCO2 450 -> 45,0 com vírgula automática', actual: normalizePco2Input('450'), expect: '45,0' },
+          { name: 'PCO2 100 -> 100 preservado como valor inteiro plausível', actual: normalizePco2Input('100'), expect: '100' },
+          { name: 'PCO2 1005 -> 100,5 com vírgula automática', actual: normalizePco2Input('1005'), expect: '100,5' },
           { name: 'PCO2 151 -> 151 para validação, sem conversão silenciosa', actual: normalizePco2Input('151'), expect: '151' },
           { name: 'PaO2 701 -> 701 para validação, sem conversão silenciosa', actual: normalizePao2Input('701'), expect: '701' },
           { name: 'PMVA 120 preservado como valor inserido', actual: normalizePmvaInput('120'), expect: '120' },
