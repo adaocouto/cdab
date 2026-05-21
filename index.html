@@ -692,16 +692,26 @@
         // Regra específica para PCO₂:
         // máximo de 4 números no total. Padrão ###,# — no máximo
         // 3 dígitos antes da vírgula e apenas 1 casa decimal.
-        // Sem separador explícito, 3 ou 4 dígitos colocam a vírgula
-        // antes do último dígito durante a digitação. Exemplos:
+        // Durante a digitação, o 3º número já vira ##,# e o 4º
+        // reposiciona a vírgula para ###,#. Exemplos:
         // 1 -> 1; 10 -> 10; 100 -> 10,0; 1000 -> 100,0; 1111 -> 111,1.
         const commaIndex = original.indexOf(',');
         if (commaIndex !== -1) {
-          const integerPart = (original.slice(0, commaIndex).replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0')
-            .slice(0, 3) || '0';
-          const decimalPart = original.slice(commaIndex + 1)
-            .replace(/\D/g, '')
-            .slice(0, 1);
+          const integerDigits = original.slice(0, commaIndex).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+          const decimalDigits = original.slice(commaIndex + 1).replace(/\D/g, '');
+
+          // Quando a vírgula foi inserida automaticamente no 3º dígito,
+          // o 4º dígito entra temporariamente como segunda casa decimal
+          // (ex.: 10,00). Nesse caso, reprocessar todos os dígitos permite
+          // que 1000 vire 100,0, em vez de ficar preso em 10,0.
+          if (decimalDigits.length > 1) {
+            const allDigits = (integerDigits + decimalDigits).replace(/^0+(?=\d)/, '').slice(0, 4) || '0';
+            if (allDigits.length <= 2) return allDigits;
+            return allDigits.slice(0, -1) + ',' + allDigits.slice(-1);
+          }
+
+          const integerPart = (integerDigits || '0').slice(0, 3) || '0';
+          const decimalPart = decimalDigits.slice(0, 1);
           return integerPart + ',' + decimalPart;
         }
 
@@ -838,6 +848,9 @@
       }
 
       function buildChlorideCorrectionText(na, cl, hco3) {
+        if (Number.isFinite(na) && !isNaPlausibleForAnionGap(na)) return '';
+        if (Number.isFinite(cl) && !isClPlausibleForAnionGap(cl)) return '';
+
         const correctedCl = computeCorrectedChloride(na, cl);
         if (!Number.isFinite(correctedCl)) return '';
 
@@ -960,6 +973,66 @@
         if (!values || values.hco3BioUserProvided === false) return false;
         if (!Number.isFinite(values.hco3Abg) || !Number.isFinite(values.hco3Bio)) return false;
         return Math.abs(values.hco3Abg - values.hco3Bio) > 3;
+      }
+
+
+      function isNaPlausibleForAnionGap(na) {
+        return Number.isFinite(na) && na >= CONSTANTS.NA_MIN && na <= CONSTANTS.NA_MAX;
+      }
+
+      function isClPlausibleForAnionGap(cl) {
+        return Number.isFinite(cl) && cl >= CONSTANTS.CL_MIN && cl <= CONSTANTS.CL_MAX;
+      }
+
+      function isHco3BioPlausibleForAnionGap(hco3Bio) {
+        return Number.isFinite(hco3Bio) && hco3Bio >= CONSTANTS.HCO3_MIN && hco3Bio <= CONSTANTS.HCO3_MAX;
+      }
+
+      function getAnionGapSuspensionReasons(values) {
+        const reasons = [];
+        if (!values || !values.anionGap) return reasons;
+
+        if (Number.isFinite(values.na) && !isNaPlausibleForAnionGap(values.na)) {
+          reasons.push('sódio fora da faixa plausível configurada (' + formatNumber(roundNumber(values.na, 1), 1) + ' mEq/L)');
+        }
+
+        if (Number.isFinite(values.cl) && !isClPlausibleForAnionGap(values.cl)) {
+          reasons.push('cloro fora da faixa plausível configurada (' + formatNumber(roundNumber(values.cl, 1), 1) + ' mEq/L)');
+        }
+
+        if (Number.isFinite(values.hco3Bio) && !isHco3BioPlausibleForAnionGap(values.hco3Bio)) {
+          reasons.push('HCO₃⁻ bioquímico fora da faixa plausível configurada (' + formatNumber(roundNumber(values.hco3Bio, 1), 1) + ' mEq/L)');
+        }
+
+        if (hasUserProvidedBicarbonateDivergence(values)) {
+          reasons.push('HCO₃⁻ gasométrico e HCO₃⁻ bioquímico divergentes em mais de 3 mEq/L');
+        }
+
+        return reasons;
+      }
+
+      function hasAnionGapInterpretationSuspension(values) {
+        return getAnionGapSuspensionReasons(values).length > 0;
+      }
+
+      function buildAnionGapSuspensionText(values) {
+        const reasons = getAnionGapSuspensionReasons(values);
+        if (!reasons.length) return '';
+        return 'Interpretação do ânion gap/delta gap suspensa: ' + reasons.join('; ') +
+          '. Revise os dados antes de aplicar ânion gap, delta gap ou delta ratio.';
+      }
+
+      function getHco3ForAnionGapInterpretation(values) {
+        if (!values) return NaN;
+        return isHco3BioPlausibleForAnionGap(values.hco3Bio) ? values.hco3Bio : NaN;
+      }
+
+      function getHco3ForChlorideCorrectionText(values) {
+        if (!values) return NaN;
+        const bioUsable =
+          isHco3BioPlausibleForAnionGap(values.hco3Bio) &&
+          !hasUserProvidedBicarbonateDivergence(values);
+        return bioUsable ? values.hco3Bio : values.hco3Abg;
       }
 
       function partialAnionGapDataMessage(na, hco3Bio, cl, albumin) {
@@ -1146,7 +1219,38 @@
         return lines.join(' ');
       }
 
-      function deltaGapText(hco3, anionGapValue) {
+      function hasImportantHypoalbuminemia(values) {
+        return !!values && Number.isFinite(values.albumin) && values.albumin > 0 && values.albumin < 2.5;
+      }
+
+      function hasHypoalbuminemiaMaskingPattern(values, anionGapValue) {
+        if (!hasImportantHypoalbuminemia(values)) return false;
+        if (!Number.isFinite(anionGapValue) || anionGapValue <= CONSTANTS.AG_NORMAL_UPPER) return false;
+        if (!values.anionGap || !Number.isFinite(values.anionGap.corrected) || values.anionGap.corrected <= CONSTANTS.AG_NORMAL_UPPER) return false;
+
+        const phNormal =
+          Number.isFinite(values.ph) &&
+          values.ph >= CONSTANTS.PH_NORMAL_MIN &&
+          values.ph <= CONSTANTS.PH_NORMAL_MAX;
+        const hco3NormalOrHigh =
+          Number.isFinite(values.hco3Abg) &&
+          values.hco3Abg >= CONSTANTS.HCO3_NORMAL_MIN;
+
+        return phNormal && hco3NormalOrHigh;
+      }
+
+      function alkalinizingMaskingText() {
+        return 'acidose metabólica de ânion gap aumentado mascarada por efeito alcalinizante concomitante, especialmente hipoalbuminemia importante e/ou alcalose metabólica, se compatível com o contexto clínico.';
+      }
+
+      function describeAlkalinizingEffectInDeltaGap(values, anionGapValue) {
+        return hasImportantHypoalbuminemia(values) || hasHypoalbuminemiaMaskingPattern(values, anionGapValue)
+          ? 'efeito alcalinizante concomitante, especialmente hipoalbuminemia importante e/ou alcalose metabólica'
+          : 'alcalose metabólica associada';
+      }
+
+
+      function deltaGapText(hco3, anionGapValue, values) {
         if (!Number.isFinite(anionGapValue) || anionGapValue <= CONSTANTS.AG_NORMAL_UPPER) return '';
         const deltaAg = anionGapValue - CONSTANTS.AG_BASELINE;
         const deltaHco3 = 24 - hco3;
@@ -1161,7 +1265,11 @@
           const deltaRatioPattern = describeDeltaRatioClinicalPattern(deltaRatio);
           if (deltaRatioPattern) lines.push(deltaRatioPattern);
         } else {
-          lines.push('Delta ratio > 2,0 (tendendo ao infinito): o HCO₃⁻ não está reduzido apesar do ânion gap elevado. Isso sugere alcalose metabólica concomitante à acidose metabólica de ânion gap aumentado.');
+          lines.push(
+            'Delta ratio > 2,0 (tendendo ao infinito): o HCO₃⁻ não está reduzido apesar do ânion gap elevado. Isso sugere acidose metabólica de ânion gap aumentado mascarada por ' +
+            describeAlkalinizingEffectInDeltaGap(values, anionGapValue) +
+            '.'
+          );
         }
 
         return lines.join('\n');
@@ -1191,23 +1299,34 @@
             (/alcalose respiratória crônica/i.test(interpretationText) && rangeDistance(values.hco3Abg, ranges.respAlkChronic) === 0)
           );
         const isRespiratoryAcidosisInterpretation = /acidose respiratória/i.test(interpretationText);
+        const hco3BetweenAcuteAndChronicRespAcidosis =
+          isRespiratoryAcidosisInterpretation &&
+          /crônica agudizada|compensação em andamento/i.test(interpretationText) &&
+          Number.isFinite(values.hco3Abg) &&
+          values.hco3Abg > ranges.respAcidAcute[1] &&
+          values.hco3Abg < ranges.respAcidChronic[0];
         const hco3HighExplainedByRespiratoryAcidosis =
           isRespiratoryAcidosisInterpretation &&
           Number.isFinite(values.hco3Abg) &&
           (
             rangeDistance(values.hco3Abg, ranges.respAcidAcute) === 0 ||
-            rangeDistance(values.hco3Abg, ranges.respAcidChronic) === 0
+            rangeDistance(values.hco3Abg, ranges.respAcidChronic) === 0 ||
+            hco3BetweenAcuteAndChronicRespAcidosis
           );
-        const suspendAnionGapInterpretation = hasUserProvidedBicarbonateDivergence(values);
+        const suspendAnionGapInterpretation = hasAnionGapInterpretationSuspension(values);
+        const hco3ForAnionGapInterpretation = getHco3ForAnionGapInterpretation(values);
+        const hypoalbuminemiaMaskingPattern = hasHypoalbuminemiaMaskingPattern(values, anionGapValue);
+        const metabolicAlkalosisMentionOnlyFromHypoalbuminemiaMasking =
+          hypoalbuminemiaMaskingPattern &&
+          !(Number.isFinite(values.hco3Abg) && values.hco3Abg > CONSTANTS.HCO3_NORMAL_MAX) &&
+          !(Number.isFinite(values.hco3Bio) && values.hco3Bio > CONSTANTS.HCO3_NORMAL_MAX);
 
         if (suspendAnionGapInterpretation && values.anionGap) {
-          findings.push(
-            'Ânion gap/delta gap não interpretados: HCO₃⁻ gasométrico e HCO₃⁻ bioquímico divergiram mais de 3 mEq/L. Revise amostra, método e transcrição antes de aplicar delta gap/delta ratio.'
-          );
+          // A suspensão já é exibida junto ao bloco do ânion gap; evitar mensagem duplicada.
         } else if (Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER) {
           const deltaAg = anionGapValue - CONSTANTS.AG_BASELINE;
-          const correctedHco3 = values.hco3Abg + deltaAg;
-          const deltaHco3 = 24 - values.hco3Abg;
+          const correctedHco3 = hco3ForAnionGapInterpretation + deltaAg;
+          const deltaHco3 = 24 - hco3ForAnionGapInterpretation;
           const lines = [
             'Avaliação do delta gap / delta ratio:',
             'HCO₃⁻ corrigido pelo delta gap: ' + formatNumber(roundNumber(correctedHco3, 1), 1) + ' mEq/L.'
@@ -1216,15 +1335,46 @@
           if (deltaHco3 > 0) {
             const deltaRatio = deltaAg / deltaHco3;
             lines.push('Delta ratio: ' + formatNumber(roundNumber(deltaRatio, 2), 2) + '.');
-            const deltaRatioPattern = describeDeltaRatioClinicalPattern(deltaRatio);
+            const deltaRatioPattern =
+              deltaRatio > 2 && hasImportantHypoalbuminemia(values)
+                ? 'Delta ratio acima de 2,0: sugere efeito alcalinizante concomitante, especialmente hipoalbuminemia importante e/ou alcalose metabólica, se compatível com o contexto clínico.'
+                : describeDeltaRatioClinicalPattern(deltaRatio);
             if (deltaRatioPattern) lines.push(deltaRatioPattern);
           } else {
-            lines.push('Delta ratio > 2,0 (tendendo ao infinito): o HCO₃⁻ não está reduzido apesar do ânion gap elevado. Diagnóstico fisiológico provável: alcalose metabólica concomitante à acidose metabólica de ânion gap aumentado.');
+            lines.push(
+              'Delta ratio > 2,0 (tendendo ao infinito): o HCO₃⁻ não está reduzido apesar do ânion gap elevado. Diagnóstico fisiológico provável: ' +
+              (
+                hypoalbuminemiaMaskingPattern
+                  ? alkalinizingMaskingText()
+                  : 'alcalose metabólica concomitante à acidose metabólica de ânion gap aumentado.'
+              )
+            );
           }
 
-          if (deltaHco3 <= 0) lines.push('Achado forte: ânion gap elevado com HCO₃⁻ normal/alto. Diagnóstico fisiológico provável: acidose metabólica de ânion gap aumentado mascarada por alcalose metabólica concomitante.');
-          else if (correctedHco3 >= 30) lines.push('Achado forte: HCO₃⁻ corrigido pelo delta gap ≥ 30 mEq/L. Sugere alcalose metabólica associada.');
-          else if (correctedHco3 > 26) lines.push('Achado sensível: HCO₃⁻ corrigido pelo delta gap acima de 26 mEq/L. Pode sugerir alcalose metabólica associada leve, se compatível com o contexto clínico.');
+          if (deltaHco3 <= 0) {
+            lines.push(
+              'Achado forte: ânion gap elevado com HCO₃⁻ normal/alto. Diagnóstico fisiológico provável: ' +
+              (
+                hypoalbuminemiaMaskingPattern
+                  ? alkalinizingMaskingText()
+                  : 'acidose metabólica de ânion gap aumentado mascarada por alcalose metabólica concomitante.'
+              )
+            );
+          }
+          else if (correctedHco3 >= 30) {
+            lines.push(
+              'Achado forte: HCO₃⁻ corrigido pelo delta gap ≥ 30 mEq/L. Sugere ' +
+              describeAlkalinizingEffectInDeltaGap(values, anionGapValue) +
+              '.'
+            );
+          }
+          else if (correctedHco3 > 26) {
+            lines.push(
+              'Achado sensível: HCO₃⁻ corrigido pelo delta gap acima de 26 mEq/L. Pode sugerir ' +
+              describeAlkalinizingEffectInDeltaGap(values, anionGapValue) +
+              ' leve, se compatível com o contexto clínico.'
+            );
+          }
           else if (correctedHco3 < 22) lines.push('Achado forte: HCO₃⁻ corrigido pelo delta gap < 22 mEq/L. Sugere acidose metabólica hiperclorêmica associada.');
 
           lines.push('Orientação etiológica para ânion gap elevado: investigar consumo de bases por ácidos não mensuráveis. Mnemônico GOLDMARK/MUDPILES: glicóis, oxoprolina, lactato, D-lactato, metanol, aspirina/salicilatos, insuficiência renal/uremia e cetoacidose.');
@@ -1241,7 +1391,7 @@
         const hypoalbuminemiaText = buildHypoalbuminemiaAlkalinizingText(values);
         if (hypoalbuminemiaText) findings.push(hypoalbuminemiaText);
 
-        if (hasMetabolicAlkalosisPattern && !hco3HighExplainedByRespiratoryAcidosis) {
+        if (hasMetabolicAlkalosisPattern && !hco3HighExplainedByRespiratoryAcidosis && !metabolicAlkalosisMentionOnlyFromHypoalbuminemiaMasking) {
           findings.push(
             'Alcalose metabólica — orientação etiológica: avaliar o cloro urinário para diferenciar causas cloro-responsivas, como vômitos e uso recente de diuréticos, de causas cloro-resistentes, como hiperaldosteronismo.'
           );
@@ -1264,7 +1414,7 @@
           }
         }
 
-        const chlorideText = buildChlorideCorrectionText(values.na, values.cl, values.hco3Bio);
+        const chlorideText = buildChlorideCorrectionText(values.na, values.cl, getHco3ForChlorideCorrectionText(values));
         if (chlorideText) {
           findings.push(chlorideText);
         }
@@ -1454,7 +1604,13 @@
           if (Number.isFinite(values.albumin)) fields.add('albumin');
         }
 
-        const correctedCl = computeCorrectedChloride(values.na, values.cl);
+        const canInterpretCorrectedChloride =
+          isNaPlausibleForAnionGap(values.na) &&
+          isClPlausibleForAnionGap(values.cl);
+
+        const correctedCl = canInterpretCorrectedChloride
+          ? computeCorrectedChloride(values.na, values.cl)
+          : null;
         if (Number.isFinite(correctedCl)) {
           if (values.cl < CONSTANTS.CL_NORMAL_MIN && correctedCl >= CONSTANTS.CL_NORMAL_MIN) {
             messages.push(
@@ -1560,7 +1716,7 @@
       }
 
       function classifyAcidBase(values) {
-        const suspendAnionGapInterpretation = hasUserProvidedBicarbonateDivergence(values);
+        const suspendAnionGapInterpretation = hasAnionGapInterpretationSuspension(values);
         const anionGapValue = suspendAnionGapInterpretation ? null : getAnionGapDecisionValue(values.anionGap);
         const ranges = getCompensationRanges(values.pco2, values.hco3Abg);
         const expected = buildCompensationText(ranges);
@@ -1671,7 +1827,7 @@
           const chronicRespAcidDistance = rangeDistance(values.hco3Abg, ranges.respAcidChronic);
           if (
             values.ph > CONSTANTS.PH_NORMAL_MAX &&
-            values.pco2 < ranges.metabolicAlkalosis[0]
+            values.pco2 < ranges.metabolicAlkalosis[0] - 1
           ) {
             interpretation = 'Alcalose metabólica primária.\nPCO₂ abaixo do esperado para compensação; considerar alcalose respiratória associada ou hiperventilação relativa.';
             compensationInfo = expected.metabolicAlkalosis;
@@ -1731,9 +1887,9 @@
         } else if (flags.metabolicAlkalosis) {
           interpretation = 'Alcalose metabólica primária.';
 
-          if (values.pco2 > ranges.metabolicAlkalosis[1]) {
+          if (values.pco2 > ranges.metabolicAlkalosis[1] + 1) {
             interpretation += '\nCompensação respiratória acima do esperado ou acidose respiratória associada.';
-          } else if (values.pco2 < ranges.metabolicAlkalosis[0]) {
+          } else if (values.pco2 < ranges.metabolicAlkalosis[0] - 1) {
             interpretation += '\nAlcalose respiratória associada.';
           } else {
             interpretation += '\nCompensação respiratória adequada.';
@@ -1780,9 +1936,14 @@
           compensationInfo = expected.respAlk;
         } else if (Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER) {
           if (values.hco3Abg >= 24) {
+            const hypoalbuminemiaMaskingPattern =
+              Number.isFinite(values.albumin) && values.albumin < 2.5 &&
+              Number.isFinite(values.ph) && values.ph >= CONSTANTS.PH_NORMAL_MIN && values.ph <= CONSTANTS.PH_NORMAL_MAX;
             interpretation =
               'Acidose metabólica de ânion gap aumentado com HCO₃⁻ normal/alto.\n' +
-              'Esse padrão sugere alcalose metabólica concomitante mascarando a queda esperada do bicarbonato.';
+              (hypoalbuminemiaMaskingPattern
+                ? 'Esse padrão sugere acidose metabólica de ânion gap aumentado mascarada por efeito alcalinizante concomitante, especialmente hipoalbuminemia importante e/ou alcalose metabólica, se compatível com o contexto clínico.'
+                : 'Esse padrão sugere alcalose metabólica concomitante mascarando a queda esperada do bicarbonato.');
           } else if (values.hco3Abg >= 22 && values.hco3Abg <= 23) {
             interpretation =
               'Ânion gap aumentado com HCO₃⁻ limítrofe/baixo-normal.\n' +
@@ -1826,7 +1987,7 @@
           interpretation,
           compensationInfo,
           anionGapText: suspendAnionGapInterpretation
-            ? describeAnionGap(values.anionGap) + '\nInterpretação do ânion gap suspensa por divergência entre HCO₃⁻ gasométrico e HCO₃⁻ bioquímico > 3 mEq/L.'
+            ? describeAnionGap(values.anionGap) + '\n' + buildAnionGapSuspensionText(values)
             : describeAnionGap(values.anionGap),
           pao2Fio2Text,
           oxygenationIndexText,
@@ -1866,7 +2027,7 @@
           { name: 'PCO2 1000 -> 100,0 com padrão ###,#', actual: normalizePco2Input('1000'), expect: '100,0' },
           { name: 'PCO2 10056 limita para 4 dígitos numéricos', actual: normalizePco2Input('10056'), expect: '100,5' },
           { name: 'PCO2 151 -> 15,1 com máscara decimal automática', actual: normalizePco2Input('151'), expect: '15,1' },
-          { name: 'PCO2 12,34 limita para 1 casa decimal', actual: normalizePco2Input('12,34'), expect: '12,3' },
+          { name: 'PCO2 12,34 reprocessa 4 dígitos no padrão ###,#', actual: normalizePco2Input('12,34'), expect: '123,4' },
           { name: 'PaO2 701 -> 701 para validação, sem conversão silenciosa', actual: normalizePao2Input('701'), expect: '701' },
           { name: 'PMVA 120 preservado como valor inserido', actual: normalizePmvaInput('120'), expect: '120' },
           { name: 'HCO3 140 -> 14,0', actual: normalizeHco3Input('140'), expect: '14,0' },
@@ -1921,6 +2082,9 @@
           { name: 'Cloro corrigido detecta hipocloremia apenas aparente por hiponatremia', passed: /não interpretar como hipocloremia primária/i.test(buildChlorideCorrectionText(115, 85, 20)) },
           { name: 'Cloro corrigido detecta pseudohipercloremia por hipernatremia', passed: /aparentemente elevado[\s\S]*cloro corrigido é normal/i.test(buildChlorideCorrectionText(165, 124, 24)) },
           { name: 'Alerta de pseudohipercloremia por hipernatremia', passed: collectCompatibilityAlerts({ ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 24, na: 165, cl: 124, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /Cloro aparentemente elevado/.test(message); }) },
+          { name: 'Alertas não interpretam cloro corrigido com sódio fora da faixa plausível', passed: !collectCompatibilityAlerts({ ph: 7.28, pco2: 26, hco3Abg: 12, hco3Bio: 12, na: 90, cl: 110, albumin: NaN, anionGap: computeAnionGap(90, 12, 110, NaN), pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /Cloro corrigido|Cloro aparentemente|Cloro baixo aparente/.test(message); }) },
+          { name: 'Alertas não interpretam cloro corrigido com cloro fora da faixa plausível', passed: !collectCompatibilityAlerts({ ph: 7.28, pco2: 26, hco3Abg: 12, hco3Bio: 12, na: 140, cl: 160, albumin: NaN, anionGap: computeAnionGap(140, 12, 160, NaN), pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /Cloro corrigido|Cloro aparentemente|Cloro baixo aparente/.test(message); }) },
+          { name: 'Mensagem de suspensão do AG informa sódio inválido, não divergência fixa', passed: /sódio fora da faixa plausível/.test(buildOutputText(classifyAcidBase({ ph: 7.28, pco2: 26, hco3Abg: 12, hco3Bio: 12, hco3BioUserProvided: false, na: 90, cl: 110, albumin: NaN, anionGap: computeAnionGap(90, 12, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }))) && !/suspensa por divergência entre HCO₃⁻ gasométrico/.test(buildOutputText(classifyAcidBase({ ph: 7.28, pco2: 26, hco3Abg: 12, hco3Bio: 12, hco3BioUserProvided: false, na: 90, cl: 110, albumin: NaN, anionGap: computeAnionGap(90, 12, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }))) },
           { name: 'Alcalose metabólica com PCO2 >55 dispara alerta de teto fisiológico', passed: collectCompatibilityAlerts({ ph: 7.56, pco2: 58, hco3Abg: 50, hco3Bio: 50, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /teto usual de hipoventilação compensatória/.test(message); }) },
           { name: 'pH extremo abaixo de 6,8 dispara alerta de baixa precisão', passed: collectCompatibilityAlerts({ ph: 6.65, pco2: 110, hco3Abg: 8, hco3Bio: 8, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /zona de baixa precisão/.test(message); }) },
           { name: 'Resp acidosis acute strict center±1 at PCO2 60 -> 25 a 27', passed: roundNumber(respRanges.respAcidAcute[0], 1) === 25.0 && roundNumber(respRanges.respAcidAcute[1], 1) === 27.0 },
@@ -1961,12 +2125,12 @@
           { name: 'Alcalose respiratória aguda', values: { ph: 7.50, pco2: 30, hco3Abg: 22, anionGap: null, oxygenationIndex: null }, expect: /alcalose respiratória aguda/i },
           { name: 'Alcalose respiratória crônica', values: { ph: 7.46, pco2: 30, hco3Abg: 19, anionGap: null, oxygenationIndex: null }, expect: /alcalose respiratória crônica/i },
           { name: 'Distúrbio misto: acidose metabólica + alcalose respiratória com AG aumentado', values: { ph: 7.39, pco2: 20, hco3Abg: 14, anionGap: computeAnionGap(140, 14, 104, NaN), oxygenationIndex: null }, expect: /acidose metabólica \+ alcalose respiratória/i },
-          { name: 'AG alto com HCO3 limítrofe aplica delta gap', values: { ph: 7.40, pco2: 41, hco3Abg: 22, anionGap: computeAnionGap(137, 22, 90, NaN), oxygenationIndex: null }, expect: /limítrofe[\s\S]*HCO₃⁻ corrigido pelo delta gap[\s\S]*Sugere alcalose metabólica associada/i },
-          { name: 'AG alto com HCO3 normal indica alcalose metabólica concomitante', values: { ph: 7.40, pco2: 40, hco3Abg: 24, anionGap: computeAnionGap(140, 24, 90, NaN), oxygenationIndex: null }, expect: /alcalose metabólica concomitante/i },
-          { name: 'AG alto sugere GOLDMARK/MUDPILES', values: { ph: 7.25, pco2: 26, hco3Abg: 12, anionGap: computeAnionGap(140, 12, 100, NaN), oxygenationIndex: null }, expect: /GOLDMARK\/MUDPILES[\s\S]*lactato[\s\S]*cetoacidose/i },
-          { name: 'Acidose metabólica com AG normal sugere perdas digestivas ou RTA', values: { ph: 7.28, pco2: 28, hco3Abg: 14, anionGap: computeAnionGap(140, 14, 116, NaN), oxygenationIndex: null }, expect: /ânion gap normal[\s\S]*perdas digestivas de bicarbonato[\s\S]*RTA/i },
+          { name: 'AG alto com HCO3 limítrofe aplica delta gap', values: { ph: 7.40, pco2: 41, hco3Abg: 22, hco3Bio: 22, hco3BioUserProvided: false, na: 137, cl: 90, albumin: NaN, anionGap: computeAnionGap(137, 22, 90, NaN), oxygenationIndex: null }, expect: /limítrofe[\s\S]*HCO₃⁻ corrigido pelo delta gap[\s\S]*Sugere alcalose metabólica associada/i },
+          { name: 'AG alto com HCO3 normal indica alcalose metabólica concomitante', values: { ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 24, hco3BioUserProvided: false, na: 140, cl: 90, albumin: NaN, anionGap: computeAnionGap(140, 24, 90, NaN), oxygenationIndex: null }, expect: /alcalose metabólica concomitante/i },
+          { name: 'AG alto sugere GOLDMARK/MUDPILES', values: { ph: 7.25, pco2: 26, hco3Abg: 12, hco3Bio: 12, hco3BioUserProvided: false, na: 140, cl: 100, albumin: NaN, anionGap: computeAnionGap(140, 12, 100, NaN), oxygenationIndex: null }, expect: /GOLDMARK\/MUDPILES[\s\S]*lactato[\s\S]*cetoacidose/i },
+          { name: 'Acidose metabólica com AG normal sugere perdas digestivas ou RTA', values: { ph: 7.28, pco2: 28, hco3Abg: 14, hco3Bio: 14, hco3BioUserProvided: false, na: 140, cl: 116, albumin: NaN, anionGap: computeAnionGap(140, 14, 116, NaN), oxygenationIndex: null }, expect: /ânion gap normal[\s\S]*perdas digestivas de bicarbonato[\s\S]*RTA/i },
           { name: 'Alcalose metabólica sugere cloro urinário', values: { ph: 7.52, pco2: 48, hco3Abg: 38, anionGap: null, oxygenationIndex: null }, expect: /cloro urinário[\s\S]*cloro-responsivas[\s\S]*cloro-resistentes/i },
-          { name: 'Alcalose respiratória com AG alto também recebe delta gap', values: { ph: 7.50, pco2: 30, hco3Abg: 22, anionGap: computeAnionGap(140, 22, 90, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /alcalose respiratória aguda[\s\S]*ânion gap aumentado[\s\S]*HCO₃⁻ corrigido pelo delta gap/i },
+          { name: 'Alcalose respiratória com AG alto também recebe delta gap', values: { ph: 7.50, pco2: 30, hco3Abg: 22, hco3Bio: 22, hco3BioUserProvided: false, na: 140, cl: 90, albumin: NaN, anionGap: computeAnionGap(140, 22, 90, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /alcalose respiratória aguda[\s\S]*ânion gap aumentado[\s\S]*HCO₃⁻ corrigido pelo delta gap/i },
           { name: 'Alcalose respiratória com HCO3 abaixo de 12 vira distúrbio misto', values: { ph: 7.55, pco2: 15, hco3Abg: 10, anionGap: computeAnionGap(140, 10, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /acidose metabólica \+ alcalose respiratória|alcalose respiratória \+ acidose metabólica/i },
           { name: 'Acidemia com parâmetros limítrofes', values: { ph: 7.32, pco2: 45, hco3Abg: 23, anionGap: null, oxygenationIndex: null }, expect: /Acidemia com PCO₂/i },
           { name: 'Alcalemia com parâmetros limítrofes', values: { ph: 7.48, pco2: 35, hco3Abg: 26, anionGap: null, oxygenationIndex: null }, expect: /Alcalemia com PCO₂/i }
