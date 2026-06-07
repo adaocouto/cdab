@@ -444,9 +444,9 @@
     <section id="resultSection" class="result" aria-labelledby="resultadoTitulo">
       <h2 id="resultadoTitulo">Interpretação</h2>
       <textarea id="interp" name="interp" readonly></textarea>
-      <div id="status" class="status">Pronto para cálculo.</div>
       <div id="sensitiveBox" class="sensitive-box" role="status" aria-live="polite"></div>
       <div id="alertBox" class="alert" role="alert" aria-live="polite"></div>
+      <div id="status" class="status">Pronto para cálculo.</div>
     </section>
   
     <div class="legal-disclaimer">
@@ -1997,14 +1997,16 @@
       }
 
       function buildOutputText(result) {
+        // O campo principal deve conter apenas a interpretação e os cálculos.
+        // Os achados sensíveis/avisos clínicos são exibidos exclusivamente
+        // no bloco próprio abaixo da interpretação, evitando mensagens duplicadas.
         return [
           result.interpretation,
           result.compensationInfo,
           result.anionGapText,
           result.pao2Fio2Text,
           result.oxygenationIndexText,
-          result.validationText,
-          result.sensitiveFindingsText
+          result.validationText
         ].filter(Boolean).join('\n\n');
       }
 
@@ -2245,8 +2247,29 @@
         });
       }
 
+      function normalizeMessageForDeduplication(message) {
+        return String(message == null ? '' : message)
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+      }
+
+      function deduplicateTextItems(items) {
+        const seen = new Set();
+        return (items || []).filter(function (item) {
+          const text = String(item == null ? '' : item).trim();
+          if (!text) return false;
+
+          const key = normalizeMessageForDeduplication(text);
+          if (seen.has(key)) return false;
+
+          seen.add(key);
+          return true;
+        });
+      }
+
       function showAlertMessages(messages, fieldNames) {
-        const validMessages = (messages || []).filter(Boolean);
+        const validMessages = deduplicateTextItems(messages);
         markFieldAlerts(fieldNames || []);
 
         if (!validMessages.length) {
@@ -2281,11 +2304,17 @@
           return;
         }
 
-        const blocks = text.split(/\n\n+/).map(function (block) {
+        const uniqueBlocks = deduplicateTextItems(text.split(/\n\n+/));
+        const blocks = uniqueBlocks.map(function (block) {
           return '<div class="sensitive-block">' + escapeHtml(block).replace(/\n/g, '<br>') + '</div>';
         }).join('');
 
-        DOM.sensitiveBox.innerHTML = '<h3>ACHADOS SENSÍVEIS / ALERTAS CLÍNICOS</h3>' + blocks;
+        if (!blocks) {
+          clearSensitiveFindings();
+          return;
+        }
+
+        DOM.sensitiveBox.innerHTML = '<h3>AVISOS CLÍNICOS</h3>' + blocks;
         DOM.sensitiveBox.style.display = 'block';
       }
 
