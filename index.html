@@ -81,6 +81,45 @@
       padding: 16px;
     }
 
+    .stacked-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .collapsible-card {
+      width: 100%;
+    }
+
+    .collapsible-card summary.card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .collapsible-card summary.card-header::-webkit-details-marker {
+      display: none;
+    }
+
+    .collapsible-card summary.card-header::after {
+      content: '▾';
+      font-size: 0.95rem;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .collapsible-card:not([open]) summary.card-header::after {
+      transform: rotate(-90deg);
+    }
+
+    .collapsible-card:not([open]) {
+      box-shadow: var(--shadow);
+    }
+
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -327,14 +366,12 @@
     <h1>Interpretação de Distúrbios Ácido-Base</h1>
     <p class="subtitle">Ferramenta educacional para interpretação de gasometria arterial e cálculo do ânion gap.</p>
 
-    <form id="acidBaseForm" class="card" novalidate>
-      <div class="card-header">Gasometria e ânion gap</div>
+    <form id="acidBaseForm" class="stacked-form" novalidate>
+      <details id="gasometriaTab" class="card collapsible-card" open>
+        <summary class="card-header">Dados da Gasometria</summary>
 
-      <div class="card-body">
-        <div class="grid">
-          <section class="panel" aria-labelledby="gasometriaTitulo">
-            <h2 id="gasometriaTitulo">Dados da gasometria</h2>
-
+        <div class="card-body">
+          <section class="panel" aria-label="Campos de gasometria">
             <div class="field">
               <label for="ph">pH</label>
               <input id="ph" name="ph" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 7,345">
@@ -363,82 +400,88 @@
             </div>
 
           </section>
+        </div>
+      </details>
 
-          <section class="panel secondary" aria-labelledby="agTitulo">
-            <h2 id="agTitulo">Dados complementares</h2>
+      <details id="dadosComplementaresTab" class="card collapsible-card">
+        <summary class="card-header">Dados complementares</summary>
 
-            <div class="subpanel-grid">
-              <section class="subpanel" aria-labelledby="anionGapTitulo">
-                <h3 id="anionGapTitulo">Ânion gap</h3>
+        <div class="card-body">
+          <section class="panel secondary" aria-labelledby="anionGapTitulo">
+            <h2 id="anionGapTitulo">Ânion gap</h2>
 
-                <div class="field">
-                  <label for="na">Sódio (Na⁺)</label>
-                  <input id="na" name="na" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 140">
-                  <span class="meta">mEq/L</span>
-                </div>
+            <div class="field">
+              <label for="na">Sódio (Na⁺)</label>
+              <input id="na" name="na" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 140">
+              <span class="meta">mEq/L</span>
+            </div>
 
-                <div class="field">
-                  <label for="bicarb">HCO₃⁻ (bioquímica)</label>
-                  <input id="bicarb" name="bicarb" type="text" inputmode="decimal" autocomplete="off" maxlength="4" placeholder="Ex.: 14,0">
-                  <span class="meta">mEq/L</span>
-                </div>
+            <div class="field">
+              <label for="bicarb">HCO₃⁻ (bioquímica)</label>
+              <input id="bicarb" name="bicarb" type="text" inputmode="decimal" autocomplete="off" maxlength="4" placeholder="Ex.: 14,0">
+              <span class="meta">mEq/L</span>
+            </div>
 
-                <div class="field">
-                  <label for="cl">Cloro (Cl⁻)</label>
-                  <input id="cl" name="cl" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 104">
-                  <span class="meta">mEq/L</span>
-                </div>
+            <div class="field">
+              <label for="cl">Cloro (Cl⁻)</label>
+              <input id="cl" name="cl" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 104">
+              <span class="meta">mEq/L</span>
+            </div>
 
-                <div class="field">
-                  <label for="albumin">Albumina</label>
-                  <input id="albumin" name="albumin" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 4,4">
-                  <span class="meta">g/dL</span>
-                </div>
+            <div class="field">
+              <label for="albumin">Albumina</label>
+              <input id="albumin" name="albumin" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 4,4">
+              <span class="meta">g/dL</span>
+            </div>
 
-                <div class="field">
-                  <label for="agap">Ânion Gap</label>
-                  <input id="agap" name="agap" type="text" readonly>
-                  <span class="meta"></span>
-                </div>
-              </section>
-
-              <section class="subpanel" aria-labelledby="oiTitulo">
-                <h3 id="oiTitulo">Índice de oxigenação </h3>
-
-                <div class="field">
-                  <label for="pao2">PaO₂</label>
-                  <input id="pao2" name="pao2" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 80,0">
-                  <span class="meta">mmHg</span>
-                </div>
-
-                <div class="field">
-                  <label for="fio2">FiO₂</label>
-                  <input id="fio2" name="fio2" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 0,21">
-                  <span class="meta">fração inspirada</span>
-                </div>
-
-                <div class="field">
-                  <label for="pfRatio">Relação P/F</label>
-                  <input id="pfRatio" name="pfRatio" type="text" readonly>
-                  <span class="meta">PaO₂ ÷ FiO₂</span>
-                </div>
-
-                <div class="field">
-                  <label for="pmva">PMVA vias aéreas</label>
-                  <input id="pmva" name="pmva" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 12,0">
-                  <span class="meta">cmH₂O</span>
-                </div>
-
-                <div class="field">
-                  <label for="oi">Índice de oxigenação</label>
-                  <input id="oi" name="oi" type="text" readonly>
-                  <span class="meta">IO = (PMVA × FiO₂ × 100) / PaO₂</span>
-                </div>
-              </section>
+            <div class="field">
+              <label for="agap">Ânion Gap</label>
+              <input id="agap" name="agap" type="text" readonly>
+              <span class="meta"></span>
             </div>
           </section>
         </div>
-      </div>
+      </details>
+
+      <details id="indiceOxigenacaoTab" class="card collapsible-card">
+        <summary class="card-header">Índice de oxigenação</summary>
+
+        <div class="card-body">
+          <section class="panel secondary" aria-labelledby="oiTitulo">
+            <h2 id="oiTitulo">Índice de oxigenação</h2>
+
+            <div class="field">
+              <label for="pao2">PaO₂</label>
+              <input id="pao2" name="pao2" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 80,0">
+              <span class="meta">mmHg</span>
+            </div>
+
+            <div class="field">
+              <label for="fio2">FiO₂</label>
+              <input id="fio2" name="fio2" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 0,21">
+              <span class="meta">fração inspirada</span>
+            </div>
+
+            <div class="field">
+              <label for="pfRatio">Relação P/F</label>
+              <input id="pfRatio" name="pfRatio" type="text" readonly>
+              <span class="meta">PaO₂ ÷ FiO₂</span>
+            </div>
+
+            <div class="field">
+              <label for="pmva">PMVA vias aéreas</label>
+              <input id="pmva" name="pmva" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 12,0">
+              <span class="meta">cmH₂O</span>
+            </div>
+
+            <div class="field">
+              <label for="oi">Índice de oxigenação</label>
+              <input id="oi" name="oi" type="text" readonly>
+              <span class="meta">IO = (PMVA × FiO₂ × 100) / PaO₂</span>
+            </div>
+          </section>
+        </div>
+      </details>
     </form>
 
     <section id="resultSection" class="result" aria-labelledby="resultadoTitulo">
@@ -2678,6 +2721,16 @@
         });
       }
 
+      function forceInitialTabState() {
+        const gasometriaTab = document.getElementById('gasometriaTab');
+        const dadosComplementaresTab = document.getElementById('dadosComplementaresTab');
+        const indiceOxigenacaoTab = document.getElementById('indiceOxigenacaoTab');
+
+        if (gasometriaTab) gasometriaTab.setAttribute('open', '');
+        if (dadosComplementaresTab) dadosComplementaresTab.removeAttribute('open');
+        if (indiceOxigenacaoTab) indiceOxigenacaoTab.removeAttribute('open');
+      }
+
       function bindMainEvents() {
         DOM.calculateButton.addEventListener('click', calculate);
 
@@ -2690,6 +2743,7 @@
       }
 
       function init() {
+        forceInitialTabState();
         bindFormatting();
         bindMainEvents();
         bindAutoCalculationEvents();
@@ -2713,6 +2767,13 @@
 
     AcidBaseApp.init();
     AcidBaseApp.updateAutoCalculatedFields();
+
+    window.addEventListener('pageshow', function () {
+      const dadosComplementaresTab = document.getElementById('dadosComplementaresTab');
+      const indiceOxigenacaoTab = document.getElementById('indiceOxigenacaoTab');
+      if (dadosComplementaresTab) dadosComplementaresTab.removeAttribute('open');
+      if (indiceOxigenacaoTab) indiceOxigenacaoTab.removeAttribute('open');
+    });
 
   </script>
 </body>
