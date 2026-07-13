@@ -354,6 +354,14 @@
       margin-top: 12px;
     }
 
+    .version-name {
+      margin-top: 2px;
+      text-align: center;
+      color: #5c6f87;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
     .spacer-3lines {
       height: 4.2em;
     }
@@ -488,7 +496,7 @@
       <h2 id="resultadoTitulo">Interpretação</h2>
       <textarea id="interp" name="interp" readonly></textarea>
       <div id="sensitiveBox" class="sensitive-box" role="status" aria-live="polite"></div>
-      <div id="alertBox" class="alert" role="alert" aria-live="polite"></div>
+      <div id="alertBox" class="alert" role="alert"></div>
       <div id="status" class="status">Pronto para cálculo.</div>
     </section>
   
@@ -503,6 +511,7 @@
     </div>
 
     <div class="signature-block"><strong>Desenvolvido por Adão L. L. Couto</strong></div>
+    <div class="version-name">1.09.07.13</div>
 
     <div class="spacer-3lines" aria-hidden="true"></div>
 
@@ -925,11 +934,11 @@
         }
 
         if (correctedCl > CONSTANTS.CL_NORMAL_MAX) {
-          lines.push('Cloro corrigido elevado: sugere hipercloremia relativa/componente acidificante, especialmente se HCO₃⁻ estiver baixo ou houver uso de soro fisiológico/acidose tubular/diarreia.');
+          lines.push('Cloro corrigido elevado: pode sugerir hipercloremia relativa/componente acidificante, especialmente se HCO₃⁻ estiver baixo ou houver uso de soro fisiológico/acidose tubular/diarreia.');
         } else if (correctedCl > CONSTANTS.CL_RELATIVE_NEUTRAL && Number.isFinite(hco3) && hco3 <= CONSTANTS.HCO3_NORMAL_MIN) {
           lines.push('Cloro corrigido normal-alto/relativamente elevado com HCO₃⁻ baixo: considerar componente hiperclorêmico discreto se compatível com o contexto clínico.');
         } else if (correctedCl < CONSTANTS.CL_NORMAL_MIN) {
-          lines.push('Cloro corrigido baixo: sugere hipocloremia verdadeira relativa ao sódio, compatível com tendência alcalinizante se o contexto clínico apoiar.');
+          lines.push('Cloro corrigido baixo: pode sugerir hipocloremia verdadeira relativa ao sódio, compatível com tendência alcalinizante se o contexto clínico apoiar.');
         }
 
         return lines.join('\n');
@@ -1148,53 +1157,44 @@
       }
 
       function getCompensationRanges(pco2, hco3) {
+        // As equações lineares abaixo são usadas integralmente para classificação.
+        // Limites fisiológicos tradicionais permanecem apenas como alertas de plausibilidade.
         const winterRawCenter = 1.5 * hco3 + 8;
-        const winterCenter = Math.max(winterRawCenter, CONSTANTS.WINTER_PCO2_FLOOR);
-        const winter = [
-          Math.max(winterCenter - 2, CONSTANTS.WINTER_PCO2_FLOOR),
-          winterCenter + 2
-        ];
+        const winter = [winterRawCenter - 2, winterRawCenter + 2];
 
         const metabolicAlkalosisDeltaHco3 = hco3 - 24;
         const metabolicAlkalosisRawLow = 40 + (0.6 * metabolicAlkalosisDeltaHco3);
         const metabolicAlkalosisRawHigh = 40 + (0.75 * metabolicAlkalosisDeltaHco3);
         const metabolicAlkalosisRawCenter = (metabolicAlkalosisRawLow + metabolicAlkalosisRawHigh) / 2;
-        const metabolicAlkalosisLow = Math.min(
-          Math.max(metabolicAlkalosisRawLow, 0),
-          CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING
-        );
-        const metabolicAlkalosisHigh = Math.min(
-          Math.max(metabolicAlkalosisRawHigh, metabolicAlkalosisLow),
-          CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING
-        );
-        const metabolicAlkalosis = [metabolicAlkalosisLow, metabolicAlkalosisHigh];
+        const metabolicAlkalosisSensitive = [metabolicAlkalosisRawLow, metabolicAlkalosisRawHigh];
+        const metabolicAlkalosisBroadCenter = 40 + (0.7 * metabolicAlkalosisDeltaHco3);
+        const metabolicAlkalosis = [
+          metabolicAlkalosisBroadCenter - 5,
+          metabolicAlkalosisBroadCenter + 5
+        ];
 
         const deltaRespAcid = (pco2 - 40) / 10;
-        const respAcidAcuteRawCenter = 24 + (1 * deltaRespAcid);
+        const respAcidAcuteRawCenter = 24 + deltaRespAcid;
         const respAcidChronicRawCenter = 24 + (4 * deltaRespAcid);
-        const respAcidAcuteCenter = Math.min(respAcidAcuteRawCenter, CONSTANTS.RESP_ACID_ACUTE_HCO3_CEILING);
-        const respAcidChronicCenter = Math.min(respAcidChronicRawCenter, CONSTANTS.RESP_ACID_CHRONIC_HCO3_CEILING);
         const respAcidAcute = [
-          respAcidAcuteCenter - 1,
-          Math.min(respAcidAcuteCenter + 1, CONSTANTS.RESP_ACID_ACUTE_HCO3_CEILING)
+          respAcidAcuteRawCenter - 1,
+          respAcidAcuteRawCenter + 1
         ];
         const respAcidChronic = [
-          respAcidChronicCenter - 2,
-          Math.min(respAcidChronicCenter + 2, CONSTANTS.RESP_ACID_CHRONIC_HCO3_CEILING)
+          respAcidChronicRawCenter - 2,
+          respAcidChronicRawCenter + 2
         ];
 
         const deltaRespAlk = (40 - pco2) / 10;
         const respAlkAcuteRawCenter = 24 - (2 * deltaRespAlk);
         const respAlkChronicRawCenter = 24 - (5 * deltaRespAlk);
-        const respAlkAcuteCenter = Math.max(respAlkAcuteRawCenter, CONSTANTS.RESP_ALK_HCO3_FLOOR);
-        const respAlkChronicCenter = Math.max(respAlkChronicRawCenter, CONSTANTS.RESP_ALK_HCO3_FLOOR);
         const respAlkAcute = [
-          Math.max(respAlkAcuteCenter - 2, CONSTANTS.RESP_ALK_HCO3_FLOOR),
-          respAlkAcuteCenter + 2
+          respAlkAcuteRawCenter - 2,
+          respAlkAcuteRawCenter + 2
         ];
         const respAlkChronic = [
-          Math.max(respAlkChronicCenter - 2, CONSTANTS.RESP_ALK_HCO3_FLOOR),
-          respAlkChronicCenter + 2
+          respAlkChronicRawCenter - 2,
+          respAlkChronicRawCenter + 2
         ];
 
         return {
@@ -1202,9 +1202,11 @@
           winterRawCenter,
           winterPco2Floor: CONSTANTS.WINTER_PCO2_FLOOR,
           metabolicAlkalosis,
+          metabolicAlkalosisSensitive,
           metabolicAlkalosisRawCenter,
           metabolicAlkalosisRawLow,
           metabolicAlkalosisRawHigh,
+          metabolicAlkalosisBroadCenter,
           metabolicAlkalosisCeiling: CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING,
           respAcidAcute,
           respAcidChronic,
@@ -1332,30 +1334,27 @@
           (Number.isFinite(values.hco3Bio) && values.hco3Bio > CONSTANTS.HCO3_NORMAL_MAX) ||
           /alcalose metabólica/i.test(interpretationText);
         const isPureRespiratoryAlkalosis =
-          /alcalose respiratória (aguda|crônica)/i.test(interpretationText) &&
+          /alcalose respiratória/i.test(interpretationText) &&
           !/acidose metabólica/i.test(interpretationText);
+        const respiratoryAlkalosisCourse = classifyRespiratoryTimeCourse(
+          values.hco3Abg,
+          ranges.respAlkAcute,
+          ranges.respAlkChronic
+        );
         const hco3LowExplainedByRespiratoryAlkalosis =
           isPureRespiratoryAlkalosis &&
           Number.isFinite(values.hco3Abg) &&
-          (
-            (/alcalose respiratória aguda/i.test(interpretationText) && rangeDistance(values.hco3Abg, ranges.respAlkAcute) === 0) ||
-            (/alcalose respiratória crônica/i.test(interpretationText) && rangeDistance(values.hco3Abg, ranges.respAlkChronic) === 0)
-          );
+          ['acute', 'chronic', 'between', 'overlap'].includes(respiratoryAlkalosisCourse.status);
         const isRespiratoryAcidosisInterpretation = /acidose respiratória/i.test(interpretationText);
-        const hco3BetweenAcuteAndChronicRespAcidosis =
-          isRespiratoryAcidosisInterpretation &&
-          /crônica agudizada|compensação em andamento/i.test(interpretationText) &&
-          Number.isFinite(values.hco3Abg) &&
-          values.hco3Abg > ranges.respAcidAcute[1] &&
-          values.hco3Abg < ranges.respAcidChronic[0];
+        const respiratoryAcidosisCourse = classifyRespiratoryTimeCourse(
+          values.hco3Abg,
+          ranges.respAcidAcute,
+          ranges.respAcidChronic
+        );
         const hco3HighExplainedByRespiratoryAcidosis =
           isRespiratoryAcidosisInterpretation &&
           Number.isFinite(values.hco3Abg) &&
-          (
-            rangeDistance(values.hco3Abg, ranges.respAcidAcute) === 0 ||
-            rangeDistance(values.hco3Abg, ranges.respAcidChronic) === 0 ||
-            hco3BetweenAcuteAndChronicRespAcidosis
-          );
+          ['acute', 'chronic', 'between', 'overlap'].includes(respiratoryAcidosisCourse.status);
         const suspendAnionGapInterpretation = hasAnionGapInterpretationSuspension(values);
         const hco3ForAnionGapInterpretation = getHco3ForAnionGapInterpretation(values);
         const hypoalbuminemiaMaskingPattern = hasHypoalbuminemiaMaskingPattern(values, anionGapValue);
@@ -1442,17 +1441,12 @@
 
         if (Number.isFinite(values.hco3Abg) && values.hco3Abg > CONSTANTS.HCO3_NORMAL_MAX && Number.isFinite(values.pco2)) {
           const broad = ranges.metabolicAlkalosis;
-          const center = Math.min(
-            Math.max(ranges.metabolicAlkalosisRawCenter, broad[0]),
-            broad[1]
-          );
-          const sensitiveLow = Math.max(broad[0], center - 2);
-          const sensitiveHigh = Math.min(broad[1], center + 2);
-          if (values.pco2 >= broad[0] && values.pco2 <= broad[1] && (values.pco2 < sensitiveLow || values.pco2 > sensitiveHigh)) {
+          const sensitive = ranges.metabolicAlkalosisSensitive || ranges.metabolicAlkalosis;
+          if (values.pco2 >= broad[0] && values.pco2 <= broad[1] && (values.pco2 < sensitive[0] || values.pco2 > sensitive[1])) {
             findings.push(
               'Alcalose metabólica – faixa sensível de compensação:\n' +
-              'PCO₂ observada = ' + formatNumber(roundNumber(values.pco2, 1), 1) + ' mmHg. Centro esperado ≈ ' + formatNumber(roundNumber(center, 1), 1) + ' mmHg; faixa sensível ≈ ' + formatNumber(roundNumber(sensitiveLow, 1), 1) + ' a ' + formatNumber(roundNumber(sensitiveHigh, 1), 1) + ' mmHg [40 + 0,6 a 0,75 × (HCO₃⁻ − 24)].\n' +
-              'Achado sensível: a PCO₂ está dentro da faixa convencional de compensação, mas fora da faixa estreita centrada. Considerar componente respiratório associado se compatível com o contexto clínico.'
+              'PCO₂ observada = ' + formatNumber(roundNumber(values.pco2, 1), 1) + ' mmHg. Faixa ampla para classificação ≈ ' + formatNumber(roundNumber(broad[0], 1), 1) + ' a ' + formatNumber(roundNumber(broad[1], 1), 1) + ' mmHg [40 + 0,7 × (HCO₃⁻ − 24) ± 5]. Faixa sensível ≈ ' + formatNumber(roundNumber(sensitive[0], 1), 1) + ' a ' + formatNumber(roundNumber(sensitive[1], 1), 1) + ' mmHg [40 + 0,6 a 0,75 × (HCO₃⁻ − 24)].\n' +
+              'Achado sensível: a PCO₂ está dentro da faixa ampla de compensação, mas fora da faixa sensível. Não classificar automaticamente como distúrbio respiratório misto; correlacionar com o contexto clínico.'
             );
           }
         }
@@ -1525,7 +1519,7 @@
         ) {
           messages.push(
             'PCO₂ acima de ' + formatNumber(CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING, 0) +
-            ' mmHg em alcalose metabólica ultrapassa o teto usual de hipoventilação compensatória. Trate como provável acidose respiratória associada/falência ventilatória, sedação, doença pulmonar ou fraqueza muscular, não como compensação simples.'
+            ' mmHg em alcalose metabólica ultrapassa um limite tradicional de plausibilidade para hipoventilação compensatória. A faixa matemática foi mantida sem truncamento para a classificação; este achado pode sugerir acidose respiratória associada, falência ventilatória, sedação, doença pulmonar ou fraqueza muscular e exige correlação clínica.'
           );
           fields.add('pco2');
           fields.add('hco3');
@@ -1534,12 +1528,32 @@
         if (
           Number.isFinite(values.pco2) && values.pco2 > CONSTANTS.PCO2_NORMAL_MAX &&
           Number.isFinite(values.hco3Abg) && values.hco3Abg > CONSTANTS.RESP_ACID_CHRONIC_HCO3_CEILING &&
-          !likelyPrimaryMetabolicAlkalosisWithExpectedPco2 &&
-          !(Number.isFinite(values.ph) && values.ph > CONSTANTS.PH_NORMAL_MAX && values.hco3Abg > CONSTANTS.HCO3_NORMAL_MAX)
+          !likelyPrimaryMetabolicAlkalosisWithExpectedPco2
         ) {
           messages.push(
-            'HCO₃⁻ acima de ' + formatNumber(CONSTANTS.RESP_ACID_CHRONIC_HCO3_CEILING, 0) +
-            ' mEq/L em acidose respiratória ultrapassa o teto renal esperado de compensação crônica. Trate como alcalose metabólica concomitante até prova em contrário.'
+            'HCO₃⁻ muito elevado; avaliar alcalose metabólica associada conforme contexto.'
+          );
+          fields.add('pco2');
+          fields.add('hco3');
+        }
+
+        const respiratoryAcidosisCourseForAlert =
+          Number.isFinite(values.pco2) && Number.isFinite(values.hco3Abg) && values.pco2 > CONSTANTS.PCO2_NORMAL_MAX
+            ? classifyRespiratoryTimeCourse(
+                values.hco3Abg,
+                rangesForAlerts.respAcidAcute,
+                rangesForAlerts.respAcidChronic
+              )
+            : null;
+
+        if (
+          respiratoryAcidosisCourseForAlert &&
+          respiratoryAcidosisCourseForAlert.acuteMatch &&
+          values.hco3Abg > CONSTANTS.RESP_ACID_ACUTE_HCO3_CEILING
+        ) {
+          messages.push(
+            'HCO₃⁻ acima de ' + formatNumber(CONSTANTS.RESP_ACID_ACUTE_HCO3_CEILING, 0) +
+            ' mEq/L dentro da extrapolação linear do quadro respiratório agudo. A faixa matemática foi mantida sem teto para a classificação, mas esse valor está em zona de plausibilidade limitada; confirme a temporalidade e considere bicarbonato basal elevado ou componente metabólico associado.'
           );
           fields.add('pco2');
           fields.add('hco3');
@@ -1552,10 +1566,11 @@
           const rangesForWinterWarning = getCompensationRanges(values.pco2, values.hco3Abg);
           messages.push(
             'Acidose metabólica extrema: HCO₃⁻ ≤ ' + formatNumber(CONSTANTS.EXTREME_METABOLIC_ACIDOSIS_HCO3, 0) +
-            ' mEq/L exige hiperventilação máxima para compensação. A PCO₂ esperada pela fórmula de Winter fica próxima do piso fisiológico (' +
+            ' mEq/L exige hiperventilação máxima para compensação. A faixa linear de Winter foi mantida sem piso artificial (' +
             formatNumber(roundNumber(rangesForWinterWarning.winter[0], 1), 1) + ' a ' +
             formatNumber(roundNumber(rangesForWinterWarning.winter[1], 1), 1) +
-            ' mmHg). Vigiar exaustão muscular; intubação/sedação podem quebrar o Kussmaul protetor e precipitar colapso hemodinâmico.'
+            ' mmHg); valores previstos ou observados abaixo de ' + formatNumber(CONSTANTS.WINTER_PCO2_FLOOR, 0) +
+            ' mmHg representam zona fisiologicamente extrema. Vigiar exaustão muscular; intubação/sedação podem quebrar o Kussmaul protetor e precipitar colapso hemodinâmico.'
           );
           fields.add('pco2');
           fields.add('hco3');
@@ -1600,7 +1615,7 @@
         ) {
           messages.push(
             'HCO₃⁻ abaixo de ' + formatNumber(CONSTANTS.RESP_ALK_HCO3_FLOOR, 0) +
-            ' mEq/L em alcalose respiratória não deve ser aceito como compensação isolada. Trate como acidose metabólica associada até prova em contrário.'
+            ' mEq/L em alcalose respiratória entra em zona de plausibilidade limitada para compensação isolada. A faixa matemática foi mantida sem truncamento para a classificação; este achado pode sugerir acidose metabólica associada e exige correlação clínica.'
           );
           fields.add('pco2');
           fields.add('hco3');
@@ -1620,10 +1635,10 @@
           const difference = Math.abs(values.ph - estimatedPh);
           if (difference > CONSTANTS.PH_CONSISTENCY_TOLERANCE) {
             messages.push(
-              'Valores incompatíveis entre pH, PCO₂ e HCO₃⁻. O pH estimado pelos outros dois parâmetros seria ' +
+              'AVISO DE INCOMPATIBILIDADE: pH, PCO₂ e HCO₃⁻ não são internamente coerentes pela equação de Henderson–Hasselbalch. O pH estimado pelos outros dois parâmetros seria ' +
               formatNumber(roundNumber(estimatedPh, 2), 2) +
               '. Diferença maior que ' + formatNumber(CONSTANTS.PH_CONSISTENCY_TOLERANCE, 2) +
-              ': trate a amostra/dados como clinicamente duvidosos antes de interpretar.'
+              '. A interpretação automática foi mantida, mas deve ser considerada provisória; revise digitação, tipo/qualidade da amostra e se o HCO₃⁻ é calculado ou medido.'
             );
             fields.add('ph');
             fields.add('pco2');
@@ -1679,7 +1694,7 @@
           if (correctedCl > CONSTANTS.CL_NORMAL_MAX) {
             messages.push(
               'Cloro corrigido elevado = ' + formatNumber(roundNumber(correctedCl, 1), 1) +
-              ' mEq/L. Isso sugere hipercloremia relativa/componente acidificante, mesmo que o cloro medido pareça baixo por diluição.'
+              ' mEq/L. Isso pode sugerir hipercloremia relativa/componente acidificante, mesmo que o cloro medido pareça baixo por diluição.'
             );
             fields.add('na');
             fields.add('cl');
@@ -1702,36 +1717,25 @@
           winter:
             'PCO₂ esperada (fórmula de Winter): ' +
             formatNumber(roundNumber(ranges.winter[0], 1), 1) + ' a ' +
-            formatNumber(roundNumber(ranges.winter[1], 1), 1) + ' mmHg' +
-            ((ranges.winterRawCenter < ranges.winterPco2Floor)
-              ? ' (piso fisiológico prático aplicado ≈ ' + formatNumber(ranges.winterPco2Floor, 0) + ' mmHg; valor linear bruto seria ≈ ' + formatNumber(roundNumber(ranges.winterRawCenter, 1), 1) + ' mmHg)'
-              : ''),
+            formatNumber(roundNumber(ranges.winter[1], 1), 1) + ' mmHg',
 
           metabolicAlkalosis:
-            'PCO₂ esperada: ' +
+            'PCO₂ esperada para classificação ampla: ' +
             formatNumber(roundNumber(ranges.metabolicAlkalosis[0], 1), 1) + ' a ' +
             formatNumber(roundNumber(ranges.metabolicAlkalosis[1], 1), 1) +
-            ' mmHg [40 + 0,6 a 0,75 × (HCO₃⁻ − 24); teto fisiológico de compensação ≈ ' +
-            formatNumber(roundNumber(ranges.metabolicAlkalosisCeiling, 0), 0) + ' mmHg' +
-            (ranges.metabolicAlkalosisRawHigh > ranges.metabolicAlkalosisCeiling
-              ? '; faixa linear bruta seria ≈ ' +
-                formatNumber(roundNumber(ranges.metabolicAlkalosisRawLow, 1), 1) + ' a ' +
-                formatNumber(roundNumber(ranges.metabolicAlkalosisRawHigh, 1), 1) + ' mmHg'
-              : '') + ']',
+            ' mmHg [40 + 0,7 × (HCO₃⁻ − 24) ± 5].\n' +
+            'Faixa sensível/educacional: ' +
+            formatNumber(roundNumber(ranges.metabolicAlkalosisSensitive[0], 1), 1) + ' a ' +
+            formatNumber(roundNumber(ranges.metabolicAlkalosisSensitive[1], 1), 1) +
+            ' mmHg [40 + 0,6 a 0,75 × (HCO₃⁻ − 24)].',
 
           respAcid:
             'HCO₃⁻ esperado no quadro agudo: ' +
             formatNumber(roundNumber(ranges.respAcidAcute[0], 1), 1) + ' a ' +
-            formatNumber(roundNumber(ranges.respAcidAcute[1], 1), 1) + ' mEq/L' +
-            (ranges.respAcidAcuteRawCenter > ranges.respAcidAcuteCeiling
-              ? ' (teto fisiológico aplicado ≈ ' + formatNumber(ranges.respAcidAcuteCeiling, 0) + ' mEq/L; valor linear bruto seria ≈ ' + formatNumber(roundNumber(ranges.respAcidAcuteRawCenter, 1), 1) + ')'
-              : '') + '\n' +
+            formatNumber(roundNumber(ranges.respAcidAcute[1], 1), 1) + ' mEq/L\n' +
             'HCO₃⁻ esperado no quadro crônico: ' +
             formatNumber(roundNumber(ranges.respAcidChronic[0], 1), 1) + ' a ' +
-            formatNumber(roundNumber(ranges.respAcidChronic[1], 1), 1) + ' mEq/L' +
-            (ranges.respAcidChronicRawCenter > ranges.respAcidChronicCeiling
-              ? ' (teto renal aplicado ≈ ' + formatNumber(ranges.respAcidChronicCeiling, 0) + ' mEq/L; valor linear bruto seria ≈ ' + formatNumber(roundNumber(ranges.respAcidChronicRawCenter, 1), 1) + ')'
-              : ''),
+            formatNumber(roundNumber(ranges.respAcidChronic[1], 1), 1) + ' mEq/L',
 
           respAlk:
             'HCO₃⁻ esperado no quadro agudo: ' +
@@ -1739,10 +1743,7 @@
             formatNumber(roundNumber(ranges.respAlkAcute[1], 1), 1) + ' mEq/L\n' +
             'HCO₃⁻ esperado no quadro crônico: ' +
             formatNumber(roundNumber(ranges.respAlkChronic[0], 1), 1) + ' a ' +
-            formatNumber(roundNumber(ranges.respAlkChronic[1], 1), 1) + ' mEq/L' +
-            ((ranges.respAlkAcuteRawCenter < ranges.respAlkHco3Floor || ranges.respAlkChronicRawCenter < ranges.respAlkHco3Floor)
-              ? '\nPiso fisiológico aplicado: HCO₃⁻ < ' + formatNumber(ranges.respAlkHco3Floor, 0) + ' mEq/L não deve ser aceito como compensação isolada de alcalose respiratória; considerar acidose metabólica associada.'
-              : '')
+            formatNumber(roundNumber(ranges.respAlkChronic[1], 1), 1) + ' mEq/L'
         };
       }
 
@@ -1758,6 +1759,200 @@
         );
       }
 
+
+      function isWithinRange(value, range) {
+        return Number.isFinite(value) && Array.isArray(range) &&
+          value >= range[0] && value <= range[1];
+      }
+
+      function compareToRange(value, range) {
+        if (!Number.isFinite(value) || !Array.isArray(range)) return 'invalid';
+        if (value < range[0]) return 'below';
+        if (value > range[1]) return 'above';
+        return 'inside';
+      }
+
+      function classifyRespiratoryTimeCourse(hco3, acuteRange, chronicRange) {
+        const acuteMatch = isWithinRange(hco3, acuteRange);
+        const chronicMatch = isWithinRange(hco3, chronicRange);
+        const lowerBound = Math.min(acuteRange[0], chronicRange[0]);
+        const upperBound = Math.max(acuteRange[1], chronicRange[1]);
+
+        if (acuteMatch && chronicMatch) {
+          return { status: 'overlap', acuteMatch, chronicMatch };
+        }
+        if (acuteMatch) {
+          return { status: 'acute', acuteMatch, chronicMatch };
+        }
+        if (chronicMatch) {
+          return { status: 'chronic', acuteMatch, chronicMatch };
+        }
+        if (hco3 < lowerBound) {
+          return { status: 'below', acuteMatch, chronicMatch };
+        }
+        if (hco3 > upperBound) {
+          return { status: 'above', acuteMatch, chronicMatch };
+        }
+        return { status: 'between', acuteMatch, chronicMatch };
+      }
+
+      function buildIndeterminatePattern(reason, alternatives) {
+        const lines = ['Padrão indeterminado: ' + reason];
+        if (alternatives) {
+          lines.push('Não é possível definir com segurança um distúrbio simples, a temporalidade respiratória ou a compensação apenas por estes valores. ' + alternatives);
+        }
+        return lines.join('\n');
+      }
+
+
+      function formatRangeForObservation(range) {
+        if (!Array.isArray(range) || range.length < 2) return '—';
+        return formatNumber(roundNumber(range[0], 1), 1) + ' a ' +
+          formatNumber(roundNumber(range[1], 1), 1);
+      }
+
+      function buildRespiratoryCompensationObservation(kind, hco3, acuteRange, chronicRange) {
+        const course = classifyRespiratoryTimeCourse(hco3, acuteRange, chronicRange);
+        const disorderLabel = kind === 'acidosis' ? 'acidose respiratória' : 'alcalose respiratória';
+        const acuteText = formatRangeForObservation(acuteRange);
+        const chronicText = formatRangeForObservation(chronicRange);
+        const measured = formatNumber(roundNumber(hco3, 1), 1);
+        const associatedBelow = 'acidose metabólica associada';
+        const associatedAbove = 'alcalose metabólica associada';
+
+        if (course.status === 'acute') {
+          return 'Observação sobre compensação: HCO₃⁻ observado = ' + measured +
+            ' mEq/L, dentro da faixa aguda usada (' + acuteText +
+            ' mEq/L) e fora da faixa crônica (' + chronicText +
+            ' mEq/L). Temporalidade compatível com ' + disorderLabel + ' aguda.';
+        }
+
+        if (course.status === 'chronic') {
+          return 'Observação sobre compensação: HCO₃⁻ observado = ' + measured +
+            ' mEq/L, dentro da faixa crônica usada (' + chronicText +
+            ' mEq/L) e fora da faixa aguda (' + acuteText +
+            ' mEq/L). Temporalidade compatível com ' + disorderLabel + ' crônica.';
+        }
+
+        if (course.status === 'overlap') {
+          return 'Observação sobre compensação: HCO₃⁻ observado = ' + measured +
+            ' mEq/L, dentro das faixas aguda (' + acuteText + ') e crônica (' + chronicText +
+            ') usadas. A temporalidade é indeterminada por sobreposição das faixas.';
+        }
+
+        if (course.status === 'between') {
+          return 'Observação sobre compensação: HCO₃⁻ observado = ' + measured +
+            ' mEq/L, fora das faixas aguda (' + acuteText + ') e crônica (' + chronicText +
+            ') usadas, porém situado entre elas. A temporalidade compensatória é indeterminada.';
+        }
+
+        if (course.status === 'below') {
+          return 'Observação sobre compensação: HCO₃⁻ observado = ' + measured +
+            ' mEq/L, abaixo das faixas aguda (' + acuteText + ') e crônica (' + chronicText +
+            ') usadas. A compensação não corresponde a um distúrbio respiratório isolado; considerar ' + associatedBelow + '.';
+        }
+
+        if (course.status === 'above') {
+          return 'Observação sobre compensação: HCO₃⁻ observado = ' + measured +
+            ' mEq/L, acima das faixas aguda (' + acuteText + ') e crônica (' + chronicText +
+            ') usadas. A compensação não corresponde a um distúrbio respiratório isolado; considerar ' + associatedAbove + '.';
+        }
+
+        return '';
+      }
+
+      function buildMetabolicCompensationObservation(kind, pco2, expectedRange) {
+        const position = compareToRange(pco2, expectedRange);
+        const measured = formatNumber(roundNumber(pco2, 1), 1);
+        const rangeText = formatRangeForObservation(expectedRange);
+        const formulaLabel = kind === 'acidosis' ? 'faixa de Winter' : 'faixa compensatória da alcalose metabólica';
+
+        if (position === 'inside') {
+          return 'Observação sobre compensação: PCO₂ observada = ' + measured +
+            ' mmHg, dentro da ' + formulaLabel + ' usada (' + rangeText +
+            ' mmHg). A resposta respiratória está dentro da faixa esperada.';
+        }
+
+        if (position === 'below') {
+          return 'Observação sobre compensação: PCO₂ observada = ' + measured +
+            ' mmHg, abaixo da ' + formulaLabel + ' usada (' + rangeText +
+            ' mmHg). A resposta compensatória está fora da faixa; considerar alcalose respiratória associada.';
+        }
+
+        if (position === 'above') {
+          return 'Observação sobre compensação: PCO₂ observada = ' + measured +
+            ' mmHg, acima da ' + formulaLabel + ' usada (' + rangeText +
+            ' mmHg). A resposta compensatória está fora da faixa; considerar acidose respiratória associada.';
+        }
+
+        return '';
+      }
+
+      function buildCompensationObservation(values, ranges, flags, anionGapValue) {
+        const phAcidDirection = Number.isFinite(values.ph) && values.ph < 7.40;
+        const phAlkDirection = Number.isFinite(values.ph) && values.ph > 7.40;
+        const agElevated = Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER;
+
+        if (flags.metabolicAcidosis && flags.respiratoryAcidosis) {
+          return 'Observação sobre compensação: HCO₃⁻ e PCO₂ caminham em direção acidótica. O padrão é misto e não representa compensação simples.';
+        }
+
+        if (flags.metabolicAlkalosis && flags.respiratoryAlkalosis) {
+          return 'Observação sobre compensação: HCO₃⁻ e PCO₂ caminham em direção alcalótica. O padrão é misto e não representa compensação simples.';
+        }
+
+        if (flags.metabolicAcidosis && flags.respiratoryAlkalosis) {
+          if (phAcidDirection || agElevated) {
+            return buildMetabolicCompensationObservation('acidosis', values.pco2, ranges.winter);
+          }
+          if (phAlkDirection) {
+            return buildRespiratoryCompensationObservation('alkalosis', values.hco3Abg, ranges.respAlkAcute, ranges.respAlkChronic);
+          }
+          return 'Observação sobre compensação: HCO₃⁻ e PCO₂ estão reduzidos com pH central. Há classificação fisiológica de acidose metabólica e alcalose respiratória, mas o distúrbio primário e a adequação compensatória são indeterminados sem cronologia e contexto.' + '\n' +
+            buildMetabolicCompensationObservation('acidosis', values.pco2, ranges.winter) + '\n' +
+            buildRespiratoryCompensationObservation('alkalosis', values.hco3Abg, ranges.respAlkAcute, ranges.respAlkChronic);
+        }
+
+        if (flags.metabolicAlkalosis && flags.respiratoryAcidosis) {
+          if (phAlkDirection) {
+            return buildMetabolicCompensationObservation('alkalosis', values.pco2, ranges.metabolicAlkalosis);
+          }
+          if (phAcidDirection) {
+            return buildRespiratoryCompensationObservation('acidosis', values.hco3Abg, ranges.respAcidAcute, ranges.respAcidChronic);
+          }
+          return 'Observação sobre compensação: HCO₃⁻ e PCO₂ estão elevados com pH central. Há classificação fisiológica de alcalose metabólica e acidose respiratória, mas o distúrbio primário e a adequação compensatória são indeterminados sem cronologia e contexto.' + '\n' +
+            buildMetabolicCompensationObservation('alkalosis', values.pco2, ranges.metabolicAlkalosis) + '\n' +
+            buildRespiratoryCompensationObservation('acidosis', values.hco3Abg, ranges.respAcidAcute, ranges.respAcidChronic);
+        }
+
+        if (flags.metabolicAcidosis) {
+          return buildMetabolicCompensationObservation('acidosis', values.pco2, ranges.winter);
+        }
+
+        if (flags.metabolicAlkalosis) {
+          return buildMetabolicCompensationObservation('alkalosis', values.pco2, ranges.metabolicAlkalosis);
+        }
+
+        if (flags.respiratoryAcidosis) {
+          return buildRespiratoryCompensationObservation('acidosis', values.hco3Abg, ranges.respAcidAcute, ranges.respAcidChronic);
+        }
+
+        if (flags.respiratoryAlkalosis) {
+          return buildRespiratoryCompensationObservation('alkalosis', values.hco3Abg, ranges.respAlkAcute, ranges.respAlkChronic);
+        }
+
+        return '';
+      }
+
+      function appendAnionGapClassification(text, anionGapValue) {
+        if (!Number.isFinite(anionGapValue)) {
+          return text + ', sem dados suficientes para classificar o ânion gap.';
+        }
+        return text + (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER
+          ? ', com ânion gap normal.'
+          : ', com ânion gap aumentado.');
+      }
+
       function classifyAcidBase(values) {
         const suspendAnionGapInterpretation = hasAnionGapInterpretationSuspension(values);
         const anionGapValue = suspendAnionGapInterpretation ? null : getAnionGapDecisionValue(values.anionGap);
@@ -1771,6 +1966,14 @@
           respiratoryAlkalosis: values.pco2 < CONSTANTS.PCO2_NORMAL_MIN
         };
 
+        const phAcidemia = Number.isFinite(values.ph) && values.ph < CONSTANTS.PH_NORMAL_MIN;
+        const phAlkalemia = Number.isFinite(values.ph) && values.ph > CONSTANTS.PH_NORMAL_MAX;
+        const phNearNeutral = Number.isFinite(values.ph) && !phAcidemia && !phAlkalemia;
+        const phCentered = Number.isFinite(values.ph) && Math.abs(values.ph - 7.40) <= 0.005;
+        const phAcidDirection = Number.isFinite(values.ph) && values.ph < 7.40;
+        const phAlkDirection = Number.isFinite(values.ph) && values.ph > 7.40;
+        const agElevated = Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER;
+
         let interpretation = '';
         let compensationInfo = '';
 
@@ -1782,201 +1985,188 @@
               : '\nÂnion gap aumentado.';
           }
           compensationInfo = expected.winter;
+
         } else if (flags.metabolicAlkalosis && flags.respiratoryAlkalosis) {
           interpretation = 'Distúrbio misto: alcalose metabólica + alcalose respiratória.';
           compensationInfo = expected.metabolicAlkalosis;
-        } else if (flags.metabolicAcidosis && flags.respiratoryAlkalosis) {
-          const winterDistance = rangeDistance(values.pco2, ranges.winter);
-          const acuteRespAlkDistance = rangeDistance(values.hco3Abg, ranges.respAlkAcute);
-          const chronicRespAlkDistance = rangeDistance(values.hco3Abg, ranges.respAlkChronic);
-          const agElevated = Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER;
-          const belowRespAlkFloor = values.hco3Abg < CONSTANTS.RESP_ALK_HCO3_FLOOR;
-          const neutralPhWithDualLowAbnormalities =
-            Number.isFinite(values.ph) && Math.abs(values.ph - 7.40) <= 0.01;
-          const phAcidemia = Number.isFinite(values.ph) && values.ph < CONSTANTS.PH_NORMAL_MIN;
-          const phAlkalemia = Number.isFinite(values.ph) && values.ph > CONSTANTS.PH_NORMAL_MAX;
-          const likelyPureChronicRespAlkosis =
-            values.ph > 7.40 &&
-            chronicRespAlkDistance <= acuteRespAlkDistance &&
-            !agElevated &&
-            !belowRespAlkFloor &&
-            !neutralPhWithDualLowAbnormalities;
 
-          if (neutralPhWithDualLowAbnormalities) {
-            interpretation = 'Distúrbio misto: acidose metabólica + alcalose respiratória';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : '.';
-            interpretation += '\npH em torno de 7,40 com HCO₃⁻ baixo e PCO₂ baixa: não classificar como compensação respiratória adequada isolada, mesmo se a PCO₂ cair dentro da faixa de Winter.';
-            compensationInfo = expected.winter + '\n' + expected.respAlk;
-          } else if ((phAcidemia || agElevated) && winterDistance === 0) {
-            interpretation = 'Acidose metabólica primária';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : ', sem dados suficientes para classificar o ânion gap.';
-            interpretation += '\nCompensação respiratória adequada.';
-            compensationInfo = expected.winter;
-          } else if ((phAcidemia || agElevated) && values.pco2 < ranges.winter[0]) {
-            interpretation = 'Distúrbio misto: acidose metabólica + alcalose respiratória';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : '.';
+        } else if (flags.metabolicAcidosis && flags.respiratoryAlkalosis) {
+          const winterPosition = compareToRange(values.pco2, ranges.winter);
+          const respiratoryCourse = classifyRespiratoryTimeCourse(
+            values.hco3Abg,
+            ranges.respAlkAcute,
+            ranges.respAlkChronic
+          );
+          const respiratoryRangeMatch = respiratoryCourse.acuteMatch || respiratoryCourse.chronicMatch;
+
+          if (phCentered || (!agElevated && winterPosition === 'inside' && respiratoryRangeMatch)) {
+            interpretation = 'Classificação ácido-base: acidose metabólica e alcalose respiratória.' +
+              '\nDistúrbio primário indeterminado pelo pH central e pela sobreposição das hipóteses compensatórias.';
+            if (Number.isFinite(anionGapValue)) {
+              interpretation += anionGapValue <= CONSTANTS.AG_NORMAL_UPPER
+                ? '\nÂnion gap normal.'
+                : '\nÂnion gap aumentado, reforçando o componente metabólico acidótico.';
+            }
             compensationInfo = expected.winter + '\n' + expected.respAlk;
           } else if (phAcidemia || agElevated) {
-            interpretation = 'Acidose metabólica com resposta ventilatória abaixo do esperado para a fórmula de Winter';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : '.';
-            interpretation += '\nConsidere componente respiratório acidótico relativo, apesar da PCO₂ estar abaixo do intervalo normal absoluto.';
-            compensationInfo = expected.winter;
-          } else if (belowRespAlkFloor) {
-            interpretation = 'Distúrbio misto: alcalose respiratória + acidose metabólica associada';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : '.';
-            interpretation += '\nHCO₃⁻ abaixo do piso fisiológico de compensação da alcalose respiratória.';
-            compensationInfo = expected.respAlk;
-          } else if (phAlkalemia && acuteRespAlkDistance <= chronicRespAlkDistance) {
-            interpretation = 'Alcalose respiratória aguda.';
-            compensationInfo = expected.respAlk;
-          } else if (likelyPureChronicRespAlkosis) {
-            interpretation = 'Alcalose respiratória crônica (compensada).';
-            compensationInfo = expected.respAlk;
-          } else if (winterDistance === 0) {
-            interpretation = 'Acidose metabólica primária';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : ', sem dados suficientes para classificar o ânion gap.';
-            interpretation += '\nCompensação respiratória adequada.';
-            compensationInfo = expected.winter;
-          } else if (values.pco2 < ranges.winter[0]) {
-            interpretation = 'Distúrbio misto: acidose metabólica + alcalose respiratória';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : '.';
-            compensationInfo = expected.winter + '\n' + expected.respAlk;
+            if (winterPosition === 'inside') {
+              interpretation = appendAnionGapClassification('Acidose metabólica primária', anionGapValue) +
+                '\nCompensação respiratória adequada, dentro da faixa de Winter exibida.';
+              compensationInfo = expected.winter;
+            } else if (winterPosition === 'below') {
+              interpretation = appendAnionGapClassification(
+                'Distúrbio misto: acidose metabólica + alcalose respiratória',
+                anionGapValue
+              );
+              compensationInfo = expected.winter + '\n' + expected.respAlk;
+            } else {
+              interpretation = appendAnionGapClassification(
+                'Acidose metabólica com componente respiratório acidótico relativo',
+                anionGapValue
+              ) + '\nA PCO₂ está acima da faixa de Winter exibida.';
+              compensationInfo = expected.winter;
+            }
+          } else if (phAlkDirection) {
+            if (respiratoryCourse.status === 'acute') {
+              interpretation = 'Alcalose respiratória aguda; HCO₃⁻ dentro da faixa aguda exibida.';
+              compensationInfo = expected.respAlk;
+            } else if (respiratoryCourse.status === 'chronic') {
+              interpretation = 'Alcalose respiratória crônica (compensada); HCO₃⁻ dentro da faixa crônica exibida.';
+              compensationInfo = expected.respAlk;
+            } else {
+              interpretation = 'Alcalose respiratória.';
+              compensationInfo = expected.winter + '\n' + expected.respAlk;
+            }
           } else {
-            interpretation = 'Acidose metabólica com resposta ventilatória abaixo do esperado para a fórmula de Winter';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : '.';
-            interpretation += '\nConsidere componente respiratório acidótico relativo, apesar da PCO₂ estar abaixo do intervalo normal absoluto.';
-            compensationInfo = expected.winter;
+            interpretation = 'Classificação ácido-base: acidose metabólica e alcalose respiratória.' +
+              '\nDistúrbio primário indeterminado pelo pH, devendo ser definido com cronologia e contexto clínico.';
+            compensationInfo = expected.winter + '\n' + expected.respAlk;
           }
 
         } else if (flags.metabolicAlkalosis && flags.respiratoryAcidosis) {
-          const metabolicAlkalosisDistance = rangeDistance(values.pco2, ranges.metabolicAlkalosis);
-          const acuteRespAcidDistance = rangeDistance(values.hco3Abg, ranges.respAcidAcute);
-          const chronicRespAcidDistance = rangeDistance(values.hco3Abg, ranges.respAcidChronic);
-          if (
-            values.ph > CONSTANTS.PH_NORMAL_MAX &&
-            values.pco2 < ranges.metabolicAlkalosis[0] - 1
-          ) {
-            interpretation = 'Alcalose metabólica primária.\nPCO₂ abaixo do esperado para compensação; considerar alcalose respiratória associada ou hiperventilação relativa.';
-            compensationInfo = expected.metabolicAlkalosis;
-          } else if (
-            values.ph > CONSTANTS.PH_NORMAL_MAX &&
-            values.pco2 > CONSTANTS.METABOLIC_ALKALOSIS_PCO2_CEILING
-          ) {
-            interpretation = 'Alcalose metabólica primária.\nHipoventilação acima do esperado para compensação; considerar acidose respiratória associada/falência ventilatória.';
-            compensationInfo = expected.metabolicAlkalosis;
-          } else if (
-            values.ph < CONSTANTS.PH_NORMAL_MIN &&
-            rangeDistance(values.hco3Abg, ranges.respAcidChronic) === 0
-          ) {
-            interpretation = 'Acidose respiratória crônica (compensada/parcialmente compensada).';
-            compensationInfo = expected.respAcid;
-          } else if (
-            values.ph < CONSTANTS.PH_NORMAL_MIN &&
-            values.hco3Abg > ranges.respAcidAcute[1] &&
-            values.hco3Abg < ranges.respAcidChronic[0]
-          ) {
-            interpretation = 'Acidose respiratória crônica agudizada (ou compensação em andamento).';
-            compensationInfo = expected.respAcid;
-          } else if (values.ph < CONSTANTS.PH_NORMAL_MIN && values.hco3Abg > ranges.respAcidAcute[1]) {
-            interpretation = 'Acidose respiratória aguda com alcalose metabólica associada.';
-            compensationInfo = expected.respAcid;
-          } else if (values.ph < 7.38 && acuteRespAcidDistance <= chronicRespAcidDistance + 0.25) {
-            interpretation = 'Acidose respiratória aguda.';
-            compensationInfo = expected.respAcid;
-          } else if (values.ph < 7.40 && chronicRespAcidDistance <= 2) {
-            interpretation = 'Acidose respiratória crônica (compensada).';
-            compensationInfo = expected.respAcid;
-          } else if (values.ph >= 7.40 && chronicRespAcidDistance <= 2) {
-            interpretation = 'Distúrbio misto: acidose respiratória crônica + alcalose metabólica.';
-            compensationInfo = expected.respAcid + '\n' + expected.metabolicAlkalosis;
-          } else if (values.ph > 7.40 && metabolicAlkalosisDistance <= 1) {
-            interpretation = 'Alcalose metabólica primária.\nCompensação respiratória adequada.';
-            compensationInfo = expected.metabolicAlkalosis;
+          const metabolicPosition = compareToRange(values.pco2, ranges.metabolicAlkalosis);
+          const respiratoryCourse = classifyRespiratoryTimeCourse(
+            values.hco3Abg,
+            ranges.respAcidAcute,
+            ranges.respAcidChronic
+          );
+          const respiratoryRangeMatch = respiratoryCourse.acuteMatch || respiratoryCourse.chronicMatch;
+
+          if (phCentered || (metabolicPosition === 'inside' && respiratoryRangeMatch)) {
+            interpretation = 'Classificação ácido-base: alcalose metabólica e acidose respiratória.' +
+              '\nDistúrbio primário indeterminado pelo pH central e pela sobreposição das hipóteses compensatórias.';
+            compensationInfo = expected.metabolicAlkalosis + '\n' + expected.respAcid;
+          } else if (phAlkDirection) {
+            if (metabolicPosition === 'inside' && !respiratoryRangeMatch) {
+              interpretation = 'Alcalose metabólica primária.\nCompensação respiratória adequada, dentro da faixa exibida.';
+              compensationInfo = expected.metabolicAlkalosis;
+            } else if (respiratoryRangeMatch && metabolicPosition !== 'inside') {
+              interpretation = 'Alcalose metabólica.' +
+                '\nA PCO₂ está fora da faixa compensatória metabólica usada; a possibilidade de acidose respiratória associada deve ser considerada.';
+              compensationInfo = expected.metabolicAlkalosis + '\n' + expected.respAcid;
+            } else if (metabolicPosition === 'below') {
+              interpretation = 'Alcalose metabólica com componente de alcalose respiratória relativa.\nA PCO₂ está abaixo da faixa compensatória exibida.';
+              compensationInfo = expected.metabolicAlkalosis;
+            } else if (metabolicPosition === 'above') {
+              interpretation = 'Distúrbio misto: alcalose metabólica + acidose respiratória associada.\nA PCO₂ está acima da faixa compensatória exibida.';
+              compensationInfo = expected.metabolicAlkalosis + '\n' + expected.respAcid;
+            } else {
+              interpretation = 'Alcalose metabólica.' +
+                '\nA adequação compensatória é indeterminada pelas faixas usadas; considerar acidose respiratória associada conforme o contexto.';
+              compensationInfo = expected.metabolicAlkalosis + '\n' + expected.respAcid;
+            }
+          } else if (phAcidDirection) {
+            if (respiratoryCourse.status === 'acute') {
+              interpretation = 'Acidose respiratória aguda; HCO₃⁻ dentro da faixa aguda exibida.';
+              compensationInfo = expected.respAcid;
+            } else if (respiratoryCourse.status === 'chronic') {
+              interpretation = 'Acidose respiratória crônica (compensada); HCO₃⁻ dentro da faixa crônica exibida.';
+              compensationInfo = expected.respAcid;
+            } else if (respiratoryCourse.status === 'above') {
+              interpretation = 'Acidose respiratória com alcalose metabólica associada.\nO HCO₃⁻ está acima das faixas respiratórias exibidas.';
+              compensationInfo = expected.respAcid + '\n' + expected.metabolicAlkalosis;
+            } else if (respiratoryCourse.status === 'below') {
+              interpretation = 'Distúrbio misto: acidose respiratória + acidose metabólica.\nO HCO₃⁻ está abaixo das faixas respiratórias exibidas.';
+              compensationInfo = expected.respAcid;
+            } else {
+              interpretation = 'Acidose respiratória.';
+              compensationInfo = expected.respAcid;
+            }
           } else {
-            interpretation = 'Distúrbio misto: alcalose metabólica + acidose respiratória.';
+            interpretation = 'Classificação ácido-base: alcalose metabólica e acidose respiratória.' +
+              '\nDistúrbio primário indeterminado pelo pH, devendo ser definido com cronologia e contexto clínico.';
             compensationInfo = expected.metabolicAlkalosis + '\n' + expected.respAcid;
           }
+
         } else if (flags.metabolicAcidosis) {
-          interpretation = 'Acidose metabólica primária';
-          interpretation += Number.isFinite(anionGapValue)
-            ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-            : ', sem dados suficientes para classificar o ânion gap.';
+          interpretation = appendAnionGapClassification('Acidose metabólica primária', anionGapValue);
+          const winterPosition = compareToRange(values.pco2, ranges.winter);
 
-          if (values.pco2 > ranges.winter[1]) {
-            interpretation += '\nCompensação respiratória insuficiente ou componente respiratório acidótico associado.';
-          } else if (values.pco2 < ranges.winter[0]) {
-            interpretation += '\nAlcalose respiratória associada.';
+          if (winterPosition === 'inside') {
+            interpretation += '\nCompensação respiratória adequada, dentro da faixa de Winter exibida.';
+          } else if (winterPosition === 'below') {
+            interpretation += '\nAlcalose respiratória associada; PCO₂ abaixo da faixa de Winter exibida.';
           } else {
-            interpretation += '\nCompensação respiratória adequada.';
+            interpretation += '\nComponente respiratório acidótico associado; PCO₂ acima da faixa de Winter exibida.';
           }
-
           compensationInfo = expected.winter;
+
         } else if (flags.metabolicAlkalosis) {
           interpretation = 'Alcalose metabólica primária.';
+          const metabolicPosition = compareToRange(values.pco2, ranges.metabolicAlkalosis);
 
-          if (values.pco2 > ranges.metabolicAlkalosis[1] + 1) {
-            interpretation += '\nCompensação respiratória acima do esperado ou acidose respiratória associada.';
-          } else if (values.pco2 < ranges.metabolicAlkalosis[0] - 1) {
-            interpretation += '\nAlcalose respiratória associada.';
+          if (metabolicPosition === 'inside') {
+            interpretation += '\nCompensação respiratória adequada, dentro da faixa exibida.';
+          } else if (metabolicPosition === 'below') {
+            interpretation += '\nAlcalose respiratória associada; PCO₂ abaixo da faixa compensatória exibida.';
           } else {
-            interpretation += '\nCompensação respiratória adequada.';
+            interpretation += '\nAcidose respiratória associada; PCO₂ acima da faixa compensatória exibida.';
           }
-
           compensationInfo = expected.metabolicAlkalosis;
+
         } else if (flags.respiratoryAcidosis) {
-          const acuteDistance = rangeDistance(values.hco3Abg, ranges.respAcidAcute);
-          const chronicDistance = rangeDistance(values.hco3Abg, ranges.respAcidChronic);
+          const respiratoryCourse = classifyRespiratoryTimeCourse(
+            values.hco3Abg,
+            ranges.respAcidAcute,
+            ranges.respAcidChronic
+          );
 
-          if (
-            values.ph < CONSTANTS.PH_NORMAL_MIN &&
-            rangeDistance(values.hco3Abg, ranges.respAcidChronic) === 0
-          ) {
-            interpretation = 'Acidose respiratória crônica (compensada/parcialmente compensada).';
-          } else if (values.ph < CONSTANTS.PH_NORMAL_MIN && values.hco3Abg > ranges.respAcidAcute[1]) {
-            interpretation = 'Acidose respiratória aguda com alcalose metabólica associada.';
-          } else if (values.ph < CONSTANTS.PH_NORMAL_MIN && values.hco3Abg < ranges.respAcidAcute[0]) {
-            interpretation = 'Acidose respiratória aguda com acidose metabólica associada.';
-          } else if (values.hco3Abg > ranges.respAcidChronic[1] + 2.5) {
-            interpretation = 'Acidose respiratória com alcalose metabólica associada.';
-          } else if (chronicDistance + 0.25 < acuteDistance) {
-            interpretation = 'Acidose respiratória crônica (compensada).';
+          if (respiratoryCourse.status === 'acute') {
+            interpretation = 'Acidose respiratória aguda; HCO₃⁻ dentro da faixa aguda exibida.';
+          } else if (respiratoryCourse.status === 'chronic') {
+            interpretation = 'Acidose respiratória crônica (compensada); HCO₃⁻ dentro da faixa crônica exibida.';
+          } else if (respiratoryCourse.status === 'below') {
+            interpretation = 'Acidose respiratória com acidose metabólica associada.\nO HCO₃⁻ está abaixo das faixas respiratórias exibidas.';
+          } else if (respiratoryCourse.status === 'above') {
+            interpretation = 'Acidose respiratória com alcalose metabólica associada.\nO HCO₃⁻ está acima das faixas respiratórias exibidas.';
           } else {
-            interpretation = 'Acidose respiratória aguda.';
+            interpretation = 'Acidose respiratória.';
           }
-
           compensationInfo = expected.respAcid;
+
         } else if (flags.respiratoryAlkalosis) {
-          const acuteDistance = rangeDistance(values.hco3Abg, ranges.respAlkAcute);
-          const chronicDistance = rangeDistance(values.hco3Abg, ranges.respAlkChronic);
+          const respiratoryCourse = classifyRespiratoryTimeCourse(
+            values.hco3Abg,
+            ranges.respAlkAcute,
+            ranges.respAlkChronic
+          );
 
-          if (values.hco3Abg < CONSTANTS.RESP_ALK_HCO3_FLOOR || values.hco3Abg < ranges.respAlkChronic[0] - 2.5) {
-            interpretation = 'Alcalose respiratória com acidose metabólica associada';
-            interpretation += Number.isFinite(anionGapValue)
-              ? (anionGapValue <= CONSTANTS.AG_NORMAL_UPPER ? ', com ânion gap normal.' : ', com ânion gap aumentado.')
-              : '.';
-          } else if (chronicDistance + 0.25 < acuteDistance) {
-            interpretation = 'Alcalose respiratória crônica (compensada).';
+          if (respiratoryCourse.status === 'acute') {
+            interpretation = 'Alcalose respiratória aguda; HCO₃⁻ dentro da faixa aguda exibida.';
+          } else if (respiratoryCourse.status === 'chronic') {
+            interpretation = 'Alcalose respiratória crônica (compensada); HCO₃⁻ dentro da faixa crônica exibida.';
+          } else if (respiratoryCourse.status === 'below') {
+            interpretation = appendAnionGapClassification(
+              'Alcalose respiratória com acidose metabólica associada',
+              anionGapValue
+            ) + '\nO HCO₃⁻ está abaixo das faixas respiratórias exibidas.';
+          } else if (respiratoryCourse.status === 'above') {
+            interpretation = 'Alcalose respiratória com alcalose metabólica associada.\nO HCO₃⁻ está acima das faixas respiratórias exibidas.';
           } else {
-            interpretation = 'Alcalose respiratória aguda.';
+            interpretation = 'Alcalose respiratória.';
           }
-
           compensationInfo = expected.respAlk;
+
         } else if (Number.isFinite(anionGapValue) && anionGapValue > CONSTANTS.AG_NORMAL_UPPER) {
           if (values.hco3Abg >= 24) {
             const hypoalbuminemiaMaskingPattern =
@@ -1990,25 +2180,28 @@
           } else if (values.hco3Abg >= 22 && values.hco3Abg <= 23) {
             interpretation =
               'Ânion gap aumentado com HCO₃⁻ limítrofe/baixo-normal.\n' +
-              'Considere acidose metabólica de ânion gap aumentado mascarada por outro distúrbio metabólico ou compensação.';
+              'Padrão indeterminado quanto ao distúrbio metabólico concomitante; correlacionar com delta gap, valores basais e contexto clínico.';
           } else {
             interpretation =
               'Ânion gap aumentado com HCO₃⁻ aparentemente normal.\n' +
-              'Considere distúrbio misto e correlacione clinicamente.';
+              'Padrão indeterminado: considerar distúrbio misto e correlacionar clinicamente.';
           }
         } else if (Number.isFinite(values.ph) && values.ph < CONSTANTS.PH_NORMAL_MIN) {
-          interpretation =
-            'Acidemia com PCO₂ e/ou HCO₃⁻ em faixa limítrofe.\n' +
-            'Revise arredondamento, amostra e contexto clínico; considerar distúrbio ácido-base inicial ou misto não classificado pelos limiares automáticos.';
+          interpretation = buildIndeterminatePattern(
+            'acidemia com PCO₂ e HCO₃⁻ em faixas limítrofes ou não classificáveis pelas regras automáticas.',
+            'Revisar arredondamento, tipo de amostra e contexto clínico.'
+          );
         } else if (Number.isFinite(values.ph) && values.ph > CONSTANTS.PH_NORMAL_MAX) {
-          interpretation =
-            'Alcalemia com PCO₂ e/ou HCO₃⁻ em faixa limítrofe.\n' +
-            'Revise arredondamento, amostra e contexto clínico; considerar distúrbio ácido-base inicial ou misto não classificado pelos limiares automáticos.';
+          interpretation = buildIndeterminatePattern(
+            'alcalemia com PCO₂ e HCO₃⁻ em faixas limítrofes ou não classificáveis pelas regras automáticas.',
+            'Revisar arredondamento, tipo de amostra e contexto clínico.'
+          );
         } else {
           interpretation = 'Gasometria sem distúrbio ácido-base evidente pelos critérios desta ferramenta.';
         }
 
         interpretation = appendElevatedAnionGapAssessment(interpretation, values.hco3Abg, anionGapValue);
+        const compensationObservation = buildCompensationObservation(values, ranges, flags, anionGapValue);
 
         const estimatedPh = roundNumber(hendersonEstimatedPh(values.pco2, values.hco3Abg), 2);
         const estimatedPco2 = roundNumber(values.hco3Abg / (0.0301 * Math.pow(10, values.ph - 6.1)), 0);
@@ -2028,6 +2221,7 @@
 
         return {
           interpretation,
+          compensationObservation,
           compensationInfo,
           anionGapText: suspendAnionGapInterpretation
             ? describeAnionGap(values.anionGap) + '\n' + buildAnionGapSuspensionText(values)
@@ -2039,12 +2233,14 @@
         };
       }
 
+
       function buildOutputText(result) {
         // O campo principal deve conter apenas a interpretação e os cálculos.
         // Os achados sensíveis/avisos clínicos são exibidos exclusivamente
         // no bloco próprio abaixo da interpretação, evitando mensagens duplicadas.
         return [
           result.interpretation,
+          result.compensationObservation,
           result.compensationInfo,
           result.anionGapText,
           result.pao2Fio2Text,
@@ -2130,26 +2326,26 @@
           { name: 'Alertas não interpretam cloro corrigido com sódio fora da faixa plausível', passed: !collectCompatibilityAlerts({ ph: 7.28, pco2: 26, hco3Abg: 12, hco3Bio: 12, na: 90, cl: 110, albumin: NaN, anionGap: computeAnionGap(90, 12, 110, NaN), pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /Cloro corrigido|Cloro aparentemente|Cloro baixo aparente/.test(message); }) },
           { name: 'Alertas não interpretam cloro corrigido com cloro fora da faixa plausível', passed: !collectCompatibilityAlerts({ ph: 7.28, pco2: 26, hco3Abg: 12, hco3Bio: 12, na: 140, cl: 160, albumin: NaN, anionGap: computeAnionGap(140, 12, 160, NaN), pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /Cloro corrigido|Cloro aparentemente|Cloro baixo aparente/.test(message); }) },
           { name: 'Mensagem de suspensão do AG informa sódio inválido, não divergência fixa', passed: /sódio fora da faixa plausível/.test(buildOutputText(classifyAcidBase({ ph: 7.28, pco2: 26, hco3Abg: 12, hco3Bio: 12, hco3BioUserProvided: false, na: 90, cl: 110, albumin: NaN, anionGap: computeAnionGap(90, 12, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }))) && !/suspensa por divergência entre HCO₃⁻ gasométrico/.test(buildOutputText(classifyAcidBase({ ph: 7.28, pco2: 26, hco3Abg: 12, hco3Bio: 12, hco3BioUserProvided: false, na: 90, cl: 110, albumin: NaN, anionGap: computeAnionGap(90, 12, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }))) },
-          { name: 'Alcalose metabólica com PCO2 >55 dispara alerta de teto fisiológico', passed: collectCompatibilityAlerts({ ph: 7.56, pco2: 58, hco3Abg: 50, hco3Bio: 50, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /teto usual de hipoventilação compensatória/.test(message); }) },
+          { name: 'Alcalose metabólica com PCO2 >55 gera alerta de plausibilidade sem truncar a faixa', passed: collectCompatibilityAlerts({ ph: 7.56, pco2: 58, hco3Abg: 50, hco3Bio: 50, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /limite tradicional de plausibilidade[\s\S]*faixa matemática foi mantida sem truncamento/i.test(message); }) },
           { name: 'pH extremo abaixo de 6,8 dispara alerta de baixa precisão', passed: collectCompatibilityAlerts({ ph: 6.65, pco2: 110, hco3Abg: 8, hco3Bio: 8, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /zona de baixa precisão/.test(message); }) },
           { name: 'Resp acidosis acute strict center±1 at PCO2 60 -> 25 a 27', passed: roundNumber(respRanges.respAcidAcute[0], 1) === 25.0 && roundNumber(respRanges.respAcidAcute[1], 1) === 27.0 },
           { name: 'Resp acidosis chronic strict center±2 at PCO2 60 -> 30 a 34', passed: roundNumber(respRanges.respAcidChronic[0], 1) === 30.0 && roundNumber(respRanges.respAcidChronic[1], 1) === 34.0 },
-          { name: 'Resp acidosis chronic ceiling at PCO2 110 -> upper 45', passed: roundNumber(getCompensationRanges(110, 24).respAcidChronic[1], 1) === 45.0 },
-          { name: 'Resp acidosis acute ceiling at PCO2 140 -> upper 32', passed: roundNumber(getCompensationRanges(140, 24).respAcidAcute[1], 1) === 32.0 },
-          { name: 'Winter floor at HCO3 1 -> lower bound 10', passed: roundNumber(getCompensationRanges(40, 1).winter[0], 1) === 10.0 },
+          { name: 'Resp acidosis chronic without rigid 45 ceiling at PCO2 110 -> upper 54', passed: roundNumber(getCompensationRanges(110, 24).respAcidChronic[1], 1) === 54.0 },
+          { name: 'Acidose respiratória aguda mantém extrapolação linear sem teto: PCO2 140 -> faixa 33 a 35', passed: roundNumber(getCompensationRanges(140, 24).respAcidAcute[0], 1) === 33.0 && roundNumber(getCompensationRanges(140, 24).respAcidAcute[1], 1) === 35.0 },
+          { name: 'Winter mantém faixa linear sem piso em HCO3 1', passed: roundNumber(getCompensationRanges(40, 1).winter[0], 1) === 7.5 && roundNumber(getCompensationRanges(40, 1).winter[1], 1) === 11.5 },
           { name: 'Delta ratio infinito quando HCO3 não cai', passed: /tendendo ao infinito/.test(deltaGapText(24, 25)) },
           { name: 'Delta ratio em torno de 1 orienta cetoacidose sem diagnóstico automático', passed: /cetoacidose/.test(deltaGapText(16, 20)) && /confirmar/.test(deltaGapText(16, 20)) },
           { name: 'Delta ratio 1,8 orienta acidose lática sem excluir outras causas', passed: /acidose lática/.test(deltaGapText(14, 30)) && /sem excluir/.test(deltaGapText(14, 30)) },
           { name: 'Delta ratio abaixo de 0,4 orienta componente hiperclorêmico predominante', passed: /muito baixo/.test(deltaGapText(10, 16)) && /hiperclorêmica/.test(deltaGapText(10, 16)) },
           { name: 'Hipoalbuminemia com pH e HCO3 normais gera alerta de acidose oculta', passed: /Hipoalbuminemia/.test(buildSensitiveFindingsText({ ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 24, hco3BioUserProvided: false, anionGap: computeAnionGap(140, 24, 104, 1.5), na: 140, cl: 104, albumin: 1.5, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }, 'Gasometria sem distúrbio ácido-base evidente.')) && /acidose metabólica oculta/.test(buildSensitiveFindingsText({ ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 24, hco3BioUserProvided: false, anionGap: computeAnionGap(140, 24, 104, 1.5), na: 140, cl: 104, albumin: 1.5, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }, 'Gasometria sem distúrbio ácido-base evidente.')) },
-          { name: 'Alerta de alcalose metabólica sobreposta em acidose respiratória crônica extrema', passed: collectCompatibilityAlerts({ ph: 7.36, pco2: 110, hco3Abg: 51, hco3Bio: 51, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /teto renal esperado/.test(message); }) },
+          { name: 'Alerta contextual para HCO3 muito elevado em acidose respiratória crônica extrema', passed: collectCompatibilityAlerts({ ph: 7.36, pco2: 110, hco3Abg: 51, hco3Bio: 51, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /HCO₃⁻ muito elevado/.test(message); }) },
           { name: 'Alerta de acidose metabólica extrema e exaustão muscular', passed: collectCompatibilityAlerts({ ph: 6.95, pco2: 13, hco3Abg: 3, hco3Bio: 3, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /Kussmaul protetor/.test(message); }) },
-          { name: 'Piso fisiológico da alcalose respiratória impede HCO3 esperado abaixo de 12', passed: getCompensationRanges(5, 24).respAlkChronic[0] >= CONSTANTS.RESP_ALK_HCO3_FLOOR },
-          { name: 'HCO3 abaixo de 12 em alcalose respiratória dispara alerta', passed: collectCompatibilityAlerts({ ph: 7.55, pco2: 15, hco3Abg: 10, hco3Bio: 10, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /não deve ser aceito como compensação isolada/.test(message); }) },
+          { name: 'Alcalose respiratória mantém faixa linear abaixo de 12 sem piso classificatório', passed: getCompensationRanges(5, 24).respAlkChronic[0] < CONSTANTS.RESP_ALK_HCO3_FLOOR },
+          { name: 'HCO3 abaixo de 12 em alcalose respiratória gera alerta de plausibilidade sem truncar a faixa', passed: collectCompatibilityAlerts({ ph: 7.45, pco2: 15, hco3Abg: 10, hco3Bio: 10, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /zona de plausibilidade limitada[\s\S]*faixa matemática foi mantida sem truncamento/i.test(message); }) },
           { name: 'AG/delta gap suspenso quando HCO3 gasométrico e bioquímico divergem', passed: /não interpretados|suspensa/.test(buildOutputText(classifyAcidBase({ ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 14, hco3BioUserProvided: true, anionGap: computeAnionGap(140, 14, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }))) && !/Delta ratio:|HCO₃⁻ corrigido pelo delta gap|alcalose metabólica concomitante/i.test(buildOutputText(classifyAcidBase({ ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 14, hco3BioUserProvided: true, anionGap: computeAnionGap(140, 14, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }))) },
-          { name: 'Alcalose metabólica com PCO2 abaixo do esperado não vira acidose respiratória', passed: /PCO₂ abaixo do esperado[\s\S]*alcalose respiratória associada/i.test(buildOutputText(classifyAcidBase({ ph: 7.52, pco2: 46, hco3Abg: 38, hco3Bio: 38, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }))) && !/alcalose metabólica \+ acidose respiratória/i.test(buildOutputText(classifyAcidBase({ ph: 7.52, pco2: 46, hco3Abg: 38, hco3Bio: 38, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }))) },
-          { name: 'Alcalose metabólica com PCO2 acima de 55 não diz compensação adequada', passed: /Hipoventilação acima do esperado|acidose respiratória associada/i.test(buildOutputText(classifyAcidBase({ ph: 7.55, pco2: 56, hco3Abg: 50, hco3Bio: 50, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }))) && !/Compensação respiratória adequada/.test(buildOutputText(classifyAcidBase({ ph: 7.55, pco2: 56, hco3Abg: 50, hco3Bio: 50, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }))) && !collectCompatibilityAlerts({ ph: 7.55, pco2: 56, hco3Abg: 50, hco3Bio: 50, anionGap: null, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /teto renal esperado/.test(message); }) },
-          { name: 'Henderson-Hasselbalch alerta com diferença > 0,04', passed: collectCompatibilityAlerts({ ph: 7.40, pco2: 40, hco3Abg: 21.5, hco3Bio: 21.5, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /clinicamente duvidosos/.test(message); }) }
+          { name: 'Alcalose metabólica com PCO2 abaixo da faixa ampla não vira acidose respiratória', passed: /Alcalose respiratória associada/i.test(buildOutputText(classifyAcidBase({ ph: 7.52, pco2: 43, hco3Abg: 38, hco3Bio: 38, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }))) && !/alcalose metabólica \+ acidose respiratória/i.test(buildOutputText(classifyAcidBase({ ph: 7.52, pco2: 43, hco3Abg: 38, hco3Bio: 38, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }))) },
+          { name: 'Alcalose metabólica com PCO2 acima de 55 mantém classificação matemática e gera alerta de plausibilidade', passed: /Compensação respiratória adequada/.test(buildOutputText(classifyAcidBase({ ph: 7.55, pco2: 56, hco3Abg: 50, hco3Bio: 50, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }))) && collectCompatibilityAlerts({ ph: 7.55, pco2: 56, hco3Abg: 50, hco3Bio: 50, anionGap: null, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /faixa matemática foi mantida sem truncamento/i.test(message); }) },
+          { name: 'Henderson-Hasselbalch avisa incompatibilidade sem suspender interpretação', passed: /Acidose respiratória|Acidose metabólica|alcalose|Gasometria/i.test(buildOutputText(classifyAcidBase({ ph: 7.40, pco2: 60, hco3Abg: 24, hco3Bio: 24, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }))) && collectCompatibilityAlerts({ ph: 7.40, pco2: 60, hco3Abg: 24, hco3Bio: 24, na: NaN, cl: NaN, albumin: NaN, pao2: NaN, fio2: NaN, pmva: NaN, fio2Raw: '' }).messages.some(function (message) { return /AVISO DE INCOMPATIBILIDADE[\s\S]*interpretação automática foi mantida/i.test(message); }) }
         ];
 
         const clinicalCases = [
@@ -2159,34 +2355,83 @@
           { name: 'Acidose metabólica com AG aumentado e Winter adequado', values: { ph: 7.22, pco2: 20, hco3Abg: 8, anionGap: computeAnionGap(140, 8, 102, NaN), oxygenationIndex: null }, expect: /Acidose metabólica primária[\s\S]*ânion gap aumentado[\s\S]*Compensação respiratória adequada/i },
           { name: 'Alcalose respiratória aguda com HCO3 19 não vira crônica', values: { ph: 7.52, pco2: 25, hco3Abg: 19, anionGap: null, oxygenationIndex: null }, expect: /Alcalose respiratória aguda/i },
           { name: 'AG elevado com HCO3 baixo e PCO2 abaixo de Winter vira misto', values: { ph: 7.45, pco2: 20, hco3Abg: 14, anionGap: computeAnionGap(140, 14, 110, NaN), oxygenationIndex: null }, expect: /acidose metabólica \+ alcalose respiratória[\s\S]*ânion gap aumentado/i },
-          { name: 'pH 7,40 com HCO3 baixo e PCO2 baixa é misto mesmo na faixa de Winter', values: { ph: 7.40, pco2: 30.5, hco3Abg: 15, anionGap: computeAnionGap(140, 15, 112, NaN), oxygenationIndex: null }, expect: /Distúrbio misto: acidose metabólica \+ alcalose respiratória[\s\S]*não classificar como compensação respiratória adequada isolada/i },
+          { name: 'pH 7,40 com HCO3 baixo e PCO2 baixa mantém classificação e primário indeterminado', values: { ph: 7.40, pco2: 30.5, hco3Abg: 18.3, anionGap: computeAnionGap(140, 18.3, 112, NaN), oxygenationIndex: null }, expect: /Classificação ácido-base: acidose metabólica e alcalose respiratória[\s\S]*Distúrbio primário indeterminado/i },
           { name: 'Alcalose metabólica compensada', values: { ph: 7.52, pco2: 48, hco3Abg: 38, anionGap: null, oxygenationIndex: null }, expect: /alcalose metabólica primária/i },
+          { name: 'Alcalose metabólica HCO3 34 com PCO2 44 não sobreclassifica alcalose respiratória', values: { ph: 7.52, pco2: 44, hco3Abg: 34, hco3Bio: 34, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /Alcalose metabólica primária[\s\S]*Compensação respiratória adequada/i },
+          { name: 'Alcalose metabólica HCO3 38 com PCO2 54 não sobreclassifica acidose respiratória', values: { ph: 7.47, pco2: 54, hco3Abg: 38, hco3Bio: 38, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /Alcalose metabólica primária[\s\S]*Compensação respiratória adequada/i },
           { name: 'Acidose respiratória aguda', values: { ph: 7.25, pco2: 60, hco3Abg: 26, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória aguda/i },
-          { name: 'Acidose respiratória crônica agudizada ou compensação em andamento', values: { ph: 7.29, pco2: 60, hco3Abg: 29, anionGap: null, oxygenationIndex: null }, expect: /crônica agudizada/i },
+          { name: 'Acidose respiratória entre faixas mantém classificação e temporalidade indeterminada', values: { ph: 7.29, pco2: 60, hco3Abg: 29, anionGap: null, oxygenationIndex: null }, expect: /Acidose respiratória[\s\S]*fora das faixas aguda[\s\S]*temporalidade.*indeterminada/i },
+          { name: 'Acidose respiratória crônica extrema não é forçada para aguda com alcalose metabólica', values: { ph: 7.28, pco2: 100, hco3Abg: 46, hco3Bio: 46, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /Acidose respiratória crônica/i },
           { name: 'Acidose respiratória crônica', values: { ph: 7.36, pco2: 60, hco3Abg: 31, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória crônica/i },
-          { name: 'Acidose respiratória crônica + alcalose metabólica com pH 7,40', values: { ph: 7.40, pco2: 60, hco3Abg: 32, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória crônica \+ alcalose metabólica/i },
-          { name: 'Acidose respiratória crônica + alcalose metabólica com pH acima de 7,40', values: { ph: 7.42, pco2: 60, hco3Abg: 32, anionGap: null, oxygenationIndex: null }, expect: /acidose respiratória crônica \+ alcalose metabólica/i },
-          { name: 'Acidose respiratória extrema com HCO3 acima de 45 indica alcalose metabólica', values: { ph: 7.36, pco2: 110, hco3Abg: 51, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /alcalose metabólica \+ acidose respiratória|acidose respiratória[\s\S]*alcalose metabólica/i },
+          { name: 'PCO2 e HCO3 altos com pH 7,40 mantêm classificações e primário indeterminado', values: { ph: 7.40, pco2: 60, hco3Abg: 36, anionGap: null, oxygenationIndex: null }, expect: /Classificação ácido-base: alcalose metabólica e acidose respiratória[\s\S]*Distúrbio primário indeterminado/i },
+          { name: 'PCO2 e HCO3 altos com pH normal-alto classificam alcalose metabólica e observam compensação', values: { ph: 7.42, pco2: 60, hco3Abg: 38, anionGap: null, oxygenationIndex: null }, expect: /Alcalose metabólica[\s\S]*Observação sobre compensação/i },
+          { name: 'Acidose respiratória crônica extrema com HCO3 alto não é forçada a alcalose metabólica', values: { ph: 7.29, pco2: 110, hco3Abg: 51, anionGap: null, oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /Acidose respiratória crônica \(compensada\)/i },
           { name: 'Alcalose respiratória aguda', values: { ph: 7.50, pco2: 30, hco3Abg: 22, anionGap: null, oxygenationIndex: null }, expect: /alcalose respiratória aguda/i },
           { name: 'Alcalose respiratória crônica', values: { ph: 7.46, pco2: 30, hco3Abg: 19, anionGap: null, oxygenationIndex: null }, expect: /alcalose respiratória crônica/i },
-          { name: 'Distúrbio misto: acidose metabólica + alcalose respiratória com AG aumentado', values: { ph: 7.39, pco2: 20, hco3Abg: 14, anionGap: computeAnionGap(140, 14, 104, NaN), oxygenationIndex: null }, expect: /acidose metabólica \+ alcalose respiratória/i },
-          { name: 'AG alto com HCO3 limítrofe aplica delta gap', values: { ph: 7.40, pco2: 41, hco3Abg: 22, hco3Bio: 22, hco3BioUserProvided: false, na: 137, cl: 90, albumin: NaN, anionGap: computeAnionGap(137, 22, 90, NaN), oxygenationIndex: null }, expect: /limítrofe[\s\S]*HCO₃⁻ corrigido pelo delta gap[\s\S]*Sugere alcalose metabólica associada/i },
+          { name: 'Distúrbio misto: acidose metabólica + alcalose respiratória com AG aumentado', values: { ph: 7.39, pco2: 24, hco3Abg: 14, anionGap: computeAnionGap(140, 14, 104, NaN), oxygenationIndex: null }, expect: /acidose metabólica \+ alcalose respiratória/i },
+          { name: 'AG alto com HCO3 limítrofe aplica delta gap', values: { ph: 7.35, pco2: 41, hco3Abg: 22, hco3Bio: 22, hco3BioUserProvided: false, na: 137, cl: 90, albumin: NaN, anionGap: computeAnionGap(137, 22, 90, NaN), oxygenationIndex: null }, expect: /limítrofe[\s\S]*HCO₃⁻ corrigido pelo delta gap[\s\S]*Sugere alcalose metabólica associada/i },
           { name: 'AG alto com HCO3 normal indica alcalose metabólica concomitante', values: { ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 24, hco3BioUserProvided: false, na: 140, cl: 90, albumin: NaN, anionGap: computeAnionGap(140, 24, 90, NaN), oxygenationIndex: null }, expect: /alcalose metabólica concomitante/i },
           { name: 'AG alto sugere GOLDMARK/MUDPILES', values: { ph: 7.25, pco2: 26, hco3Abg: 12, hco3Bio: 12, hco3BioUserProvided: false, na: 140, cl: 100, albumin: NaN, anionGap: computeAnionGap(140, 12, 100, NaN), oxygenationIndex: null }, expect: /GOLDMARK\/MUDPILES[\s\S]*lactato[\s\S]*cetoacidose/i },
-          { name: 'Acidose metabólica com AG normal sugere perdas digestivas ou RTA', values: { ph: 7.28, pco2: 28, hco3Abg: 14, hco3Bio: 14, hco3BioUserProvided: false, na: 140, cl: 116, albumin: NaN, anionGap: computeAnionGap(140, 14, 116, NaN), oxygenationIndex: null }, expect: /ânion gap normal[\s\S]*perdas digestivas de bicarbonato[\s\S]*RTA/i },
+          { name: 'Acidose metabólica com AG normal sugere perdas digestivas ou RTA', values: { ph: 7.32, pco2: 28, hco3Abg: 14, hco3Bio: 14, hco3BioUserProvided: false, na: 140, cl: 116, albumin: NaN, anionGap: computeAnionGap(140, 14, 116, NaN), oxygenationIndex: null }, expect: /ânion gap normal[\s\S]*perdas digestivas de bicarbonato[\s\S]*RTA/i },
           { name: 'Alcalose metabólica sugere cloro urinário', values: { ph: 7.52, pco2: 48, hco3Abg: 38, anionGap: null, oxygenationIndex: null }, expect: /cloro urinário[\s\S]*cloro-responsivas[\s\S]*cloro-resistentes/i },
           { name: 'Alcalose respiratória com AG alto também recebe delta gap', values: { ph: 7.50, pco2: 30, hco3Abg: 22, hco3Bio: 22, hco3BioUserProvided: false, na: 140, cl: 90, albumin: NaN, anionGap: computeAnionGap(140, 22, 90, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /alcalose respiratória aguda[\s\S]*ânion gap aumentado[\s\S]*HCO₃⁻ corrigido pelo delta gap/i },
-          { name: 'Alcalose respiratória com HCO3 abaixo de 12 vira distúrbio misto', values: { ph: 7.55, pco2: 15, hco3Abg: 10, anionGap: computeAnionGap(140, 10, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /acidose metabólica \+ alcalose respiratória|alcalose respiratória \+ acidose metabólica/i },
+          { name: 'HCO3 abaixo de 12 mantém a equação linear; a classificação mista decorre dos valores e a plausibilidade fica no alerta', values: { ph: 7.45, pco2: 15, hco3Abg: 10, hco3Bio: 10, hco3BioUserProvided: false, na: 140, cl: 110, albumin: NaN, anionGap: computeAnionGap(140, 10, 110, NaN), oxygenationIndex: null, pao2Fio2Ratio: null }, expect: /acidose metabólica \+ alcalose respiratória|alcalose respiratória \+ acidose metabólica/i },
           { name: 'Acidemia com parâmetros limítrofes', values: { ph: 7.32, pco2: 45, hco3Abg: 23, anionGap: null, oxygenationIndex: null }, expect: /Acidemia com PCO₂/i },
           { name: 'Alcalemia com parâmetros limítrofes', values: { ph: 7.48, pco2: 35, hco3Abg: 26, anionGap: null, oxygenationIndex: null }, expect: /Alcalemia com PCO₂/i }
         ];
 
-        const clinicalResults = clinicalCases.map(function (testCase) {
+
+        const coherenceCases = [
+          {
+            name: 'Rótulo agudo somente dentro da faixa aguda',
+            values: { ph: 7.31, pco2: 60, hco3Abg: 29, anionGap: null, oxygenationIndex: null },
+            reject: /Acidose respiratória aguda[.;]/i,
+            expect: /Acidose respiratória[\s\S]*temporalidade.*indeterminada/i
+          },
+          {
+            name: 'Rótulo crônico somente dentro da faixa crônica',
+            values: { ph: 7.32, pco2: 60, hco3Abg: 28, anionGap: null, oxygenationIndex: null },
+            reject: /Acidose respiratória crônica \(/i,
+            expect: /Acidose respiratória[\s\S]*temporalidade.*indeterminada/i
+          },
+          {
+            name: 'Compensação metabólica somente dentro da faixa exibida',
+            values: { ph: 7.30, pco2: 40, hco3Abg: 18, anionGap: null, oxygenationIndex: null },
+            reject: /Compensação respiratória adequada/i,
+            expect: /componente respiratório acidótico/i
+          },
+          {
+            name: 'Sobreposição respiratória mantém classificação e temporalidade indeterminada',
+            values: { ph: 7.43, pco2: 34, hco3Abg: 22, anionGap: null, oxygenationIndex: null },
+            reject: /Alcalose respiratória (aguda|crônica)/i,
+            expect: /Alcalose respiratória[\s\S]*temporalidade.*indeterminada/i
+          }
+        ];
+
+        const coherenceResults = coherenceCases.map(function (testCase) {
           const result = classifyAcidBase(testCase.values);
           const output = buildOutputText(result);
           return {
             name: testCase.name,
-            passed: testCase.expect.test(output),
+            passed: testCase.expect.test(output) && !testCase.reject.test(output),
+            interpretation: result.interpretation,
+            output: output
+          };
+        });
+
+        const clinicalResults = clinicalCases.map(function (testCase) {
+          const result = classifyAcidBase(testCase.values);
+          const output = [buildOutputText(result), result.sensitiveFindingsText].filter(Boolean).join('\n\n');
+          const estimatedPh = hendersonEstimatedPh(testCase.values.pco2, testCase.values.hco3Abg);
+          const consistencyDifference = Number.isFinite(testCase.values.ph) && Number.isFinite(estimatedPh)
+            ? Math.abs(testCase.values.ph - estimatedPh)
+            : 0;
+          const internallyConsistent = consistencyDifference <= CONSTANTS.PH_CONSISTENCY_TOLERANCE;
+          return {
+            name: testCase.name,
+            passed: testCase.expect.test(output) && internallyConsistent,
+            internallyConsistent,
+            consistencyDifference,
             interpretation: result.interpretation,
             output: output
           };
@@ -2194,9 +2439,10 @@
 
         const passed = maskResults.every(function (item) { return item.passed; }) &&
           arithmeticResults.every(function (item) { return item.passed; }) &&
-          clinicalResults.every(function (item) { return item.passed; });
+          clinicalResults.every(function (item) { return item.passed; }) &&
+          coherenceResults.every(function (item) { return item.passed; });
 
-        return { passed, maskResults, arithmeticResults, clinicalResults };
+        return { passed, maskResults, arithmeticResults, clinicalResults, coherenceResults };
       }
 
       return Object.freeze({
@@ -2261,7 +2507,9 @@
 
       const APP_STATE = {
         lastCalculationSucceeded: false,
-        lastCalculationHadAlerts: false
+        lastCalculationHadAlerts: false,
+        selfTestsPassed: null,
+        selfTestFailureCount: null
       };
 
       let LAST_HCO3_SOURCE = 'hco3';
@@ -2373,7 +2621,7 @@
 
         const performScroll = function () {
           const rect = DOM.resultSection.getBoundingClientRect();
-          const absoluteTop = window.pageYOffset + rect.top - 12;
+          const absoluteTop = window.scrollY + rect.top - 12;
 
           window.scrollTo({
             top: absoluteTop < 0 ? 0 : absoluteTop,
@@ -2742,15 +2990,60 @@
         DOM.form.addEventListener('reset', resetState);
       }
 
+      function collectFailedSelfTests(result) {
+        const failed = [];
+        const groups = ['maskResults', 'arithmeticResults', 'clinicalResults', 'coherenceResults'];
+
+        groups.forEach(function (groupName) {
+          const tests = result && Array.isArray(result[groupName]) ? result[groupName] : [];
+          tests.forEach(function (test) {
+            if (!test || test.passed !== true) {
+              failed.push({
+                group: groupName,
+                name: test && test.name ? test.name : 'Teste sem identificação',
+                details: test || null
+              });
+            }
+          });
+        });
+
+        return failed;
+      }
+
+      function runStartupSelfTests() {
+        try {
+          const result = core.runSelfTests();
+          const failed = collectFailedSelfTests(result);
+
+          APP_STATE.selfTestsPassed = !!(result && result.passed === true && failed.length === 0);
+          APP_STATE.selfTestFailureCount = failed.length;
+
+          if (!APP_STATE.selfTestsPassed) {
+            console.error('[CDAB] Falha nos autotestes de inicialização.', {
+              failedCount: failed.length,
+              failedTests: failed,
+              result: result || null
+            });
+          }
+
+          return result;
+        } catch (error) {
+          APP_STATE.selfTestsPassed = false;
+          APP_STATE.selfTestFailureCount = null;
+          console.error('[CDAB] Erro ao executar os autotestes de inicialização.', error);
+          return null;
+        }
+      }
+
       function init() {
         forceInitialTabState();
         bindFormatting();
         bindMainEvents();
         bindAutoCalculationEvents();
 
-        // Executa autotestes internos sem interferir na interface do usuário.
-        // Testes complementares atualizados ficam registrados em TESTES_CORE_CDAB.json.
-        core.runSelfTests();
+        // Executa autotestes internos sem interromper a interface.
+        // Falhas e exceções são capturadas e registradas no console para diagnóstico.
+        runStartupSelfTests();
       }
 
       return Object.freeze({
