@@ -1,4 +1,6 @@
 <!-- NomeDoApp = "Distúrbios Ácido-Base" -->
+<!-- AndroidVersionName = "1.11.10.11"; VersionName = "1.11.10.11" -->
+<!-- AndroidVersionCode = "262840743"; VersionCode = "262840743"; Timestamp = "2026-09-13T11:57:00-03:00" -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -332,18 +334,47 @@
       height: 1em;
     }
   
-    .legal-disclaimer {
-      margin: 16px 0 0;
-      font-size: 12px;
-      line-height: 1.2;
-      color: #5c6f87;
-      text-align: justify;
-      word-break: break-word;
-      background: var(--surface, #ffffff);
-      border: 1px solid var(--border, #cddbea);
-      border-radius: var(--radius-xl, 22px);
-      box-shadow: var(--shadow, 0 16px 34px rgba(18, 44, 73, 0.10));
-      padding: 16px;
+    .legal-disclaimer{
+      margin-top:16px;
+      padding:0;
+      border:1px solid #e2e8f0;
+      border-radius:14px;
+      background:#f8fafc;
+      box-shadow:none;
+      color:#64748b;
+      font-size:.76rem;
+      line-height:1.45;
+      text-align:left;
+      overflow:hidden;
+    }
+    .legal-disclaimer > summary{
+      list-style:none;
+      cursor:pointer;
+      position:relative;
+      padding:11px 38px 11px 13px;
+      color:#5c6f87;
+      font-size:.78rem;
+      font-weight:700;
+      user-select:none;
+    }
+    .legal-disclaimer > summary::-webkit-details-marker{display:none}
+    .legal-disclaimer > summary::after{
+      content:'＋';
+      position:absolute;
+      right:13px;
+      top:50%;
+      transform:translateY(-50%);
+      color:#7b8da0;
+      font-size:.9rem;
+      font-weight:800;
+    }
+    .legal-disclaimer[open] > summary::after{content:'−'}
+    .legal-disclaimer-content{
+      padding:0 13px 12px;
+      border-top:1px solid #edf2f7;
+      padding-top:11px;
+      text-align:justify;
+      overflow-wrap:anywhere;
     }
 
     .signature-block {
@@ -492,17 +523,14 @@
       <div id="status" class="status">Pronto para cálculo.</div>
     </section>
   
-    <div class="legal-disclaimer">
-      <strong>Aviso Legal e Isenção de Responsabilidade:</strong><br>
-      Este software e todas as informações nele contidas são fornecidos exclusivamente com propósitos educacionais e de auxílio à referência médica.
-      ESTE SISTEMA NÃO SUBSTITUI O JULGAMENTO CLÍNICO INDIVIDUAL, A ANAMNESE E O EXAME FÍSICO.
-      As informações aqui apresentadas não devem ser utilizadas isoladamente para o diagnóstico, conduta ou tratamento de pacientes.
-      A responsabilidade final por qualquer decisão clínica, prescrição ou intervenção é exclusiva do profissional de saúde assistente, devidamente habilitado.
-      Os desenvolvedores não garantem a precisão absoluta de todos os dados e isentam-se de responsabilidade por quaisquer danos diretos, indiretos, materiais ou morais que resultem do uso inadequado, interpretação equivocada ou confiança exclusiva nas informações deste sistema.
-      Pacientes e indivíduos leigos que utilizarem este software devem sempre buscar a orientação de um médico qualificado antes de tomar qualquer decisão sobre sua saúde.
-    </div>
+    <details class="legal-disclaimer legal-disclaimer-collapsible">
+      <summary>Aviso Legal e Isenção de Responsabilidade</summary>
+      <div class="legal-disclaimer-content">
+        Este software e todas as informações nele contidas são fornecidos exclusivamente com propósitos educacionais e de auxílio à referência médica. ESTE SISTEMA NÃO SUBSTITUI O JULGAMENTO CLÍNICO INDIVIDUAL, A ANAMNESE E O EXAME FÍSICO. As informações aqui apresentadas não devem ser utilizadas isoladamente para o diagnóstico, conduta ou tratamento de pacientes. A responsabilidade final por qualquer decisão clínica, prescrição ou intervenção é exclusiva do profissional de saúde assistente, devidamente habilitado. Os desenvolvedores não garantem a precisão absoluta de todos os dados e isentam-se de responsabilidade por quaisquer danos diretos, indiretos, materiais ou morais que resultem do uso inadequado, interpretação equivocada ou confiança exclusiva nas informações deste sistema. Pacientes e indivíduos leigos que utilizarem este software devem sempre buscar a orientação de um médico qualificado antes de tomar qualquer decisão sobre sua saúde.
+      </div>
+    </details>
 
-    <div class="signature-block"><strong>Desenvolvido por Adão L. L. Couto</strong><br>1.09.08.18</div>
+    <div class="signature-block"><strong>Desenvolvido por Adão L. L. Couto</strong><br><span class="version-name">1.10.09.13</span></div>
 
     <div class="spacer-3lines" aria-hidden="true"></div>
 
@@ -2183,7 +2211,19 @@
             'Revisar arredondamento, tipo de amostra e contexto clínico.'
           );
         } else {
-          interpretation = 'Gasometria sem distúrbio ácido-base evidente pelos critérios desta ferramenta.';
+          const phInReference = Number.isFinite(values.ph) && values.ph >= CONSTANTS.PH_NORMAL_MIN && values.ph <= CONSTANTS.PH_NORMAL_MAX;
+          const pco2InReference = Number.isFinite(values.pco2) && values.pco2 >= CONSTANTS.PCO2_NORMAL_MIN && values.pco2 <= CONSTANTS.PCO2_NORMAL_MAX;
+          const hco3InReference = Number.isFinite(values.hco3Abg) && values.hco3Abg >= CONSTANTS.HCO3_NORMAL_MIN && values.hco3Abg <= CONSTANTS.HCO3_NORMAL_MAX;
+          const primaryTriadInReference = phInReference && pco2InReference && hco3InReference;
+          const hendersonConsistent = isHendersonConsistent(values);
+
+          if (primaryTriadInReference && hendersonConsistent) {
+            interpretation = 'Sem distúrbio ácido-base evidente e valores internamente consistentes.';
+          } else if (primaryTriadInReference && !hendersonConsistent) {
+            interpretation = 'Parâmetros dentro das faixas de referência, porém internamente inconsistentes.';
+          } else {
+            interpretation = 'Padrão ácido-base sem classificação automática conclusiva pelos critérios desta ferramenta.';
+          }
         }
 
         interpretation = appendElevatedAnionGapAssessment(interpretation, values.hco3Abg, anionGapValue);
@@ -2349,7 +2389,7 @@
         ];
 
         const clinicalCases = [
-          { name: 'Gasometria normal', values: { ph: 7.40, pco2: 40, hco3Abg: 24, anionGap: null, oxygenationIndex: null }, expect: /sem distúrbio ácido-base evidente/i },
+          { name: 'Gasometria central internamente consistente', values: { ph: 7.40, pco2: 40, hco3Abg: 24, anionGap: null, oxygenationIndex: null }, expect: /Sem distúrbio ácido-base evidente e valores internamente consistentes\./i },
           { name: 'Acidose metabólica com compensação adequada', values: { ph: 7.28, pco2: 26, hco3Abg: 12, anionGap: computeAnionGap(140, 12, 120, 2.0), oxygenationIndex: null }, expect: /acidose metabólica primária/i },
           { name: 'Acidose metabólica grave com Winter adequado não vira alcalose respiratória', values: { ph: 7.26, pco2: 23, hco3Abg: 10, anionGap: computeAnionGap(140, 10, 118, NaN), oxygenationIndex: null }, expect: /Acidose metabólica primária[\s\S]*Compensação respiratória adequada/i },
           { name: 'Acidose metabólica com AG aumentado e Winter adequado', values: { ph: 7.22, pco2: 20, hco3Abg: 8, anionGap: computeAnionGap(140, 8, 102, NaN), oxygenationIndex: null }, expect: /Acidose metabólica primária[\s\S]*ânion gap aumentado[\s\S]*Compensação respiratória adequada/i },
@@ -2454,6 +2494,48 @@
         const extremeAlkResult = classifyAcidBase({ ph: 7.90, pco2: 20, hco3Abg: 38, anionGap: null, oxygenationIndex: null });
         const agPreservedHco3Result = classifyAcidBase({ ph: 7.40, pco2: 40, hco3Abg: 24, hco3Bio: 24, hco3BioUserProvided: true, anionGap: computeAnionGap(140, 24, 90, NaN), oxygenationIndex: null });
         const deltaOneText = deltaGapText(16, 20);
+
+        const referenceBoundaryCases = [
+          {
+            name: 'Centro das faixas 7,40 / 40 / 24 é internamente consistente',
+            values: { ph: 7.40, pco2: 40, hco3Abg: 24, anionGap: null, oxygenationIndex: null },
+            expected: /Sem distúrbio ácido-base evidente e valores internamente consistentes\./,
+            shouldBeConsistent: true
+          },
+          {
+            name: 'Limites inferiores 7,35 / 35 / 22 são internamente inconsistentes',
+            values: { ph: 7.35, pco2: 35, hco3Abg: 22, anionGap: null, oxygenationIndex: null },
+            expected: /Parâmetros dentro das faixas de referência, porém internamente inconsistentes\./,
+            shouldBeConsistent: false
+          },
+          {
+            name: 'Limites superiores 7,45 / 45 / 26 são internamente inconsistentes',
+            values: { ph: 7.45, pco2: 45, hco3Abg: 26, anionGap: null, oxygenationIndex: null },
+            expected: /Parâmetros dentro das faixas de referência, porém internamente inconsistentes\./,
+            shouldBeConsistent: false
+          }
+        ];
+
+        const referenceBoundaryResults = referenceBoundaryCases.map(function (testCase) {
+          const result = classifyAcidBase(testCase.values);
+          const output = buildOutputText(result);
+          const alerts = collectCompatibilityAlerts(testCase.values);
+          const consistent = isHendersonConsistent(testCase.values);
+          const hasProminentHendersonAlert = alerts.messages.some(function (message) {
+            return /Valores incompatíveis entre pH, PCO₂ e HCO₃⁻/.test(message);
+          });
+          return {
+            name: testCase.name,
+            passed: testCase.expected.test(result.interpretation) &&
+              consistent === testCase.shouldBeConsistent &&
+              (testCase.shouldBeConsistent ? !hasProminentHendersonAlert : hasProminentHendersonAlert) &&
+              (testCase.shouldBeConsistent || !/Sem distúrbio ácido-base evidente/.test(output)),
+            hhDifference: hendersonPhDifference(testCase.values),
+            interpretation: result.interpretation,
+            alerts: alerts.messages
+          };
+        });
+
         const numericResults = [
           { name: 'Todos os cenários clínicos respeitam Henderson-Hasselbalch em até 0,04', passed: clinicalResults.every(function (item) { return item.numericAssertionsPassed; }) },
           { name: 'Todos os cenários de coerência respeitam Henderson-Hasselbalch em até 0,04', passed: coherenceResults.every(function (item) { return item.numericAssertionsPassed; }) },
@@ -2471,9 +2553,10 @@
           arithmeticResults.every(function (item) { return item.passed; }) &&
           clinicalResults.every(function (item) { return item.passed; }) &&
           coherenceResults.every(function (item) { return item.passed; }) &&
+          referenceBoundaryResults.every(function (item) { return item.passed; }) &&
           numericResults.every(function (item) { return item.passed; });
 
-        return { passed, maskResults, arithmeticResults, clinicalResults, coherenceResults, numericResults };
+        return { passed, maskResults, arithmeticResults, clinicalResults, coherenceResults, referenceBoundaryResults, numericResults };
       }
 
       return Object.freeze({
