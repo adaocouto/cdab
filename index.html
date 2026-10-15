@@ -6,7 +6,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Interpretação de Distúrbios Ácido-Base</title>
+  <title>Interpretação de distúrbios ácido-base</title>
   <meta name="description" content="Ferramenta educacional para interpretação de gasometria arterial e cálculo do ânion gap.">
   <meta name="theme-color" content="#1f6fb2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -311,7 +311,7 @@
 
     textarea {
       width: 100%;
-      min-height: 520px;
+      min-height: 160px;
       resize: vertical;
       padding: 12px;
       border: 1px solid var(--line);
@@ -388,18 +388,37 @@
     .spacer-3lines {
       height: 4.2em;
     }
+  
+    /* Ajustes de interface selecionados */
+    body{font-family:"Segoe UI",Roboto,Arial,sans-serif}
+    .field{grid-template-columns:minmax(150px,190px) minmax(0,1fr) auto}
+    .field>input{min-width:0}
+    .field-error{grid-column:1/-1;color:var(--danger);font-size:.9rem;line-height:1.4}
+    .pf-classification{grid-column:1/-1;line-height:1.5;overflow-wrap:anywhere;color:var(--text)}
+    .pf-classification[hidden]{display:none}
+    #resultSection,#interp{background:linear-gradient(135deg,#fffdfa 0%,#fff8dd 100%)}
+    #interp{min-height:160px;overflow-y:hidden;line-height:1.5}
+    input:focus-visible,textarea:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+    @media(max-width:620px){
+      body{padding:10px}
+      .field{grid-template-columns:minmax(0,1fr) auto;gap:6px 8px}
+      .field>label{grid-column:1/-1}
+      .field>input{grid-column:1}
+      .field>.meta{grid-column:2;max-width:min(34vw,12rem);white-space:normal;overflow-wrap:anywhere}
+    }
+
   </style>
 </head>
 <body>
   <main class="container">
     <div class="espaco-antes-titulo" aria-hidden="true"></div>
 
-    <h1>Interpretação de Distúrbios Ácido-Base</h1>
+    <h1>Interpretação de distúrbios ácido-base</h1>
     <p class="subtitle">Ferramenta educacional para interpretação de gasometria arterial e cálculo do ânion gap.</p>
 
     <form id="acidBaseForm" class="stacked-form" novalidate>
       <details id="gasometriaTab" class="card collapsible-card" open>
-        <summary class="card-header">Dados da Gasometria</summary>
+        <summary class="card-header">Dados da gasometria</summary>
 
         <div class="card-body">
           <section class="panel" aria-label="Campos de gasometria">
@@ -426,9 +445,6 @@
               <button class="secondary" type="reset">Limpar</button>
             </div>
 
-            <div class="notice">
-              
-            </div>
 
           </section>
         </div>
@@ -466,7 +482,7 @@
             </div>
 
             <div class="field">
-              <label for="agap">Ânion Gap</label>
+              <label for="agap">Ânion gap</label>
               <input id="agap" name="agap" type="text" readonly>
               <span class="meta"></span>
             </div>
@@ -497,6 +513,7 @@
               <label for="pfRatio">Relação P/F</label>
               <input id="pfRatio" name="pfRatio" type="text" readonly>
               <span class="meta">PaO₂ ÷ FiO₂</span>
+              <div id="pfClassification" class="pf-classification" hidden></div>
             </div>
 
             <div class="field">
@@ -2627,6 +2644,212 @@
       let LAST_HCO3_SOURCE = 'hco3';
       let BICARB_USER_EDITED = false;
 
+      const EDITABLE_FIELDS = ['ph', 'pco2', 'hco3', 'na', 'bicarb', 'cl', 'albumin', 'pao2', 'fio2', 'pmva'];
+      const INPUT_RULES = {
+        ph: { integers: 1, decimals: 3, message: 'Digite um valor válido para o pH.' },
+        pco2: { integers: 3, decimals: 1, message: 'Digite um valor válido para a PCO₂.' },
+        hco3: { integers: 2, decimals: 1, message: 'Digite um valor válido para o HCO₃⁻.' },
+        bicarb: { integers: 2, decimals: 1, message: 'Digite um valor válido para o HCO₃⁻.' },
+        na: { integers: 3, decimals: 0, message: 'Digite um valor válido para o sódio.' },
+        cl: { integers: 3, decimals: 0, message: 'Digite um valor válido para o cloro.' },
+        albumin: { integers: 1, decimals: 1, message: 'Digite um valor válido para a albumina.' },
+        pao2: { integers: 4, decimals: 1, message: 'Digite um valor válido para a PaO₂.' },
+        fio2: { integers: 3, decimals: 2, message: 'Digite um valor válido para a FiO₂.' },
+        pmva: { integers: Infinity, decimals: Infinity, message: 'Digite um valor válido para a PMVA.' }
+      };
+      const EDIT_STATE = new Map();
+      const INLINE_ERRORS = new Map();
+      let ACTIVE_ALERT_FIELDS = new Set();
+
+      function resizeOutput() {
+        DOM.output.style.height = 'auto';
+        DOM.output.style.height = Math.max(160, DOM.output.scrollHeight + 2) + 'px';
+      }
+
+      function clearDerivedFields() {
+        ['agap', 'pfRatio', 'oi'].forEach(function (name) { DOM.form[name].value = ''; });
+        const description = document.getElementById('pfClassification');
+        description.textContent = '';
+        description.hidden = true;
+      }
+
+      function renderInlineErrors() {
+        EDITABLE_FIELDS.forEach(function (name) {
+          const field = DOM.form[name];
+          const error = document.getElementById('error_' + name);
+          const message = INLINE_ERRORS.get(name) || '';
+          error.textContent = message;
+          error.style.display = message ? 'block' : 'none';
+          if (message) {
+            field.classList.add('field-alert');
+            field.setAttribute('aria-invalid', 'true');
+            field.setAttribute('aria-describedby', error.id);
+          } else {
+            field.classList.toggle('field-alert', ACTIVE_ALERT_FIELDS.has(name));
+            field.removeAttribute('aria-invalid');
+            field.removeAttribute('aria-describedby');
+          }
+        });
+      }
+
+      function setupInlineErrors() {
+        EDITABLE_FIELDS.forEach(function (name) {
+          const error = document.createElement('div');
+          error.id = 'error_' + name;
+          error.className = 'field-error';
+          error.style.display = 'none';
+          DOM.form[name].closest('.field').appendChild(error);
+        });
+      }
+
+      function focusFirstError() {
+        const name = EDITABLE_FIELDS.find(function (fieldName) { return INLINE_ERRORS.has(fieldName); });
+        if (!name) return;
+        const field = DOM.form[name];
+        const section = field.closest('details');
+        if (section) section.open = true;
+        field.focus();
+      }
+
+      function invalidateResults() {
+        DOM.output.value = '';
+        resizeOutput();
+        clearDerivedFields();
+        clearSensitiveFindings();
+        clearAlertMessages();
+        renderInlineErrors();
+        updateAppState(false, false);
+        setStatus('Pronto para cálculo.', false);
+      }
+
+      function hasPendingEdits() {
+        return EDITABLE_FIELDS.some(function (name) { return EDIT_STATE.get(name).dirty; });
+      }
+
+      function hasFormatErrors() {
+        return EDITABLE_FIELDS.some(function (name) { return !!EDIT_STATE.get(name).formatError; });
+      }
+
+      function literalDraft(value, rules, preserveExcess) {
+        const raw = String(value == null ? '' : value).replace(/\s+/g, '').replace(/\./g, ',').replace(/[^\d,]/g, '');
+        if (!raw) return { value: '', invalid: false };
+        const parts = raw.split(',');
+        const hasSeparator = parts.length > 1;
+        let integer = (parts.shift() || '0').replace(/^0+(?=\d)/, '') || '0';
+        let decimal = parts.join('');
+        const invalid = preserveExcess && (integer.length > rules.integers || decimal.length > rules.decimals || (hasSeparator && rules.decimals === 0));
+        if (!preserveExcess) {
+          integer = integer.slice(0, rules.integers);
+          decimal = decimal.slice(0, rules.decimals);
+        }
+        return { value: integer + (hasSeparator && (rules.decimals !== 0 || preserveExcess) ? ',' + decimal : ''), invalid: invalid };
+      }
+
+      function noteEdit(name) {
+        const state = EDIT_STATE.get(name);
+        state.dirty = true;
+        state.replaceOnInput = false;
+        if (name === 'hco3' || name === 'bicarb') LAST_HCO3_SOURCE = name;
+        if (name === 'bicarb') BICARB_USER_EDITED = DOM.form.bicarb.value.trim() !== '';
+        invalidateResults();
+      }
+
+      function formatEditedInput(name, event) {
+        const field = DOM.form[name];
+        const state = EDIT_STATE.get(name);
+        if (state.replaceOnInput && event && String(event.inputType || '').indexOf('insert') === 0) {
+          if (event.data != null) field.value = event.data;
+          state.literal = false; state.pasted = false; state.formatError = '';
+        }
+        if (event && /insertFromPaste|insertReplacementText/.test(event.inputType || '')) {
+          state.literal = true;
+          state.pasted = true;
+        }
+        if (/^[,.]/.test(field.value)) state.literal = true;
+        const raw = field.value;
+        const cursor = field.selectionStart;
+        const intent = getCaretIntent(raw, cursor);
+        const result = state.literal
+          ? literalDraft(raw, INPUT_RULES[name], state.pasted)
+          : { value: state.inputFormatter(raw), invalid: false };
+        state.formatError = result.invalid ? INPUT_RULES[name].message : '';
+        if (raw !== result.value) {
+          field.value = result.value;
+          if (document.activeElement === field && typeof field.setSelectionRange === 'function') {
+            const position = findCaretPosition(result.value, intent);
+            field.setSelectionRange(position, position);
+          }
+        }
+        noteEdit(name);
+      }
+
+      function normalizeCommittedField(name) {
+        const field = DOM.form[name];
+        const state = EDIT_STATE.get(name);
+        if (!state.dirty) return;
+        state.dirty = false;
+        if (!state.formatError) {
+          if (state.literal && name !== 'fio2' && name !== 'albumin') {
+            field.value = field.value.replace(/,$/, '');
+            if (name === 'pco2' && field.value && field.value.indexOf(',') === -1) field.value += ',0';
+          } else {
+            field.value = state.blurFormatter(field.value);
+          }
+        }
+        if (name === 'bicarb') BICARB_USER_EDITED = field.value.trim() !== '';
+        if (name === 'hco3' || name === 'bicarb') syncBicarbonateFields(name);
+      }
+
+      function commitField(name) {
+        if (!EDIT_STATE.get(name).dirty) return true;
+        normalizeCommittedField(name);
+        calculate({ manual: false });
+        return !INLINE_ERRORS.has(name);
+      }
+
+      function collectInlineErrors(values, manual) {
+        const previous = new Map(INLINE_ERRORS);
+        INLINE_ERRORS.clear();
+        const required = [
+          ['ph', values.ph, 'Digite um valor válido para o pH.', core.constants.PH_MIN, core.constants.PH_MAX, 'pH fora da faixa operacional extrema para interpretação automática.'],
+          ['pco2', values.pco2, 'Digite um valor válido para a PCO₂.', core.constants.PCO2_MIN, core.constants.PCO2_MAX, 'PCO₂ fora de faixa plausível para interpretação automática.'],
+          ['hco3', values.hco3Abg, 'Digite um valor válido para o HCO₃⁻.', core.constants.HCO3_MIN, core.constants.HCO3_MAX, 'HCO₃⁻ fora de faixa plausível para interpretação automática.']
+        ];
+        required.forEach(function (item) {
+          const name = item[0], value = item[1];
+          if (!Number.isFinite(value) || value <= 0) {
+            if (manual || DOM.form[name].value !== '' || previous.has(name)) INLINE_ERRORS.set(name, item[2]);
+          } else if (value < item[3] || value > item[4]) INLINE_ERRORS.set(name, item[5]);
+        });
+        const optional = [
+          ['na', values.na, core.constants.NA_MIN, core.constants.NA_MAX, 'Sódio fora da faixa plausível configurada. Confirme se o valor foi digitado corretamente.'],
+          ['cl', values.cl, core.constants.CL_MIN, core.constants.CL_MAX, 'Cloro fora da faixa plausível configurada. Confirme se o valor foi digitado corretamente.'],
+          ['bicarb', values.hco3Bio, core.constants.HCO3_MIN, core.constants.HCO3_MAX, 'HCO₃⁻ fora da faixa plausível configurada. Confirme se o valor foi digitado corretamente.'],
+          ['pao2', values.pao2, core.constants.PAO2_MIN, core.constants.PAO2_MAX, 'PaO₂ fora da faixa plausível configurada para cálculo automático. Confirme se o valor foi digitado corretamente.'],
+          ['pmva', values.pmva, core.constants.PMVA_MIN, core.constants.PMVA_MAX, 'PMVA fora da faixa plausível configurada para cálculo automático. Confirme se o valor foi digitado corretamente.']
+        ];
+        optional.forEach(function (item) {
+          if (Number.isFinite(item[1]) && (item[1] < item[2] || item[1] > item[3])) INLINE_ERRORS.set(item[0], item[4]);
+        });
+        if (Number.isFinite(values.albumin) && values.albumin <= 0) INLINE_ERRORS.set('albumin', 'Albumina inválida: use valor maior que zero para correção do ânion gap.');
+        const agMessage = core.partialAnionGapDataMessage(values.na, values.hco3Bio, values.cl, values.albumin);
+        if (agMessage && /preencha/.test(agMessage)) {
+          [['na', values.na], ['bicarb', values.hco3Bio], ['cl', values.cl]].forEach(function (item) {
+            if (!Number.isFinite(item[1])) INLINE_ERRORS.set(item[0], agMessage);
+          });
+        }
+        const oxygenMessage = core.partialOxygenationDataMessage(values.pao2, values.fio2, values.pmva, values.fio2Raw);
+        if (oxygenMessage) {
+          if (!Number.isFinite(values.pao2) && (Number.isFinite(values.fio2) || Number.isFinite(values.pmva))) INLINE_ERRORS.set('pao2', oxygenMessage);
+          if (!Number.isFinite(values.fio2) && (Number.isFinite(values.pao2) || Number.isFinite(values.pmva) || values.fio2Raw)) INLINE_ERRORS.set('fio2', oxygenMessage);
+        }
+        EDITABLE_FIELDS.forEach(function (name) {
+          const error = EDIT_STATE.get(name).formatError;
+          if (error) INLINE_ERRORS.set(name, error);
+        });
+      }
+
+
       function createValidationError(message, fields) {
         return { type: 'validation', message: message, fields: fields || [] };
       }
@@ -2644,8 +2867,9 @@
 
       function markFieldAlerts(fieldNames) {
         clearFieldAlerts();
-        (fieldNames || []).forEach(function (fieldName) {
-          const field = DOM.form[fieldName];
+        ACTIVE_ALERT_FIELDS = new Set(fieldNames || []);
+        ACTIVE_ALERT_FIELDS.forEach(function (name) {
+          const field = DOM.form[name];
           if (field) field.classList.add('field-alert');
         });
       }
@@ -2686,6 +2910,7 @@
       }
 
       function clearAlertMessages() {
+        ACTIVE_ALERT_FIELDS.clear();
         clearFieldAlerts();
         DOM.alertBox.innerHTML = '';
         DOM.alertBox.style.display = 'none';
@@ -2717,7 +2942,7 @@
           return;
         }
 
-        DOM.sensitiveBox.innerHTML = '<h3>AVISOS CLÍNICOS</h3>' + blocks;
+        DOM.sensitiveBox.innerHTML = '<h3>Avisos clínicos</h3>' + blocks;
         DOM.sensitiveBox.style.display = 'block';
       }
 
@@ -2910,29 +3135,13 @@
 
       function applyInputFormatter(fieldName, inputFormatter, blurFormatter) {
         const field = DOM.form[fieldName];
-        if (!field) return;
-
-        field.addEventListener('input', function () {
-          const rawValue = field.value;
-          const cursorPosition = field.selectionStart;
-          const intent = getCaretIntent(rawValue, cursorPosition);
-          const formatted = inputFormatter(rawValue);
-
-          if (rawValue !== formatted) {
-            field.value = formatted;
-
-            if (document.activeElement === field && typeof field.setSelectionRange === 'function') {
-              const newPosition = findCaretPosition(formatted, intent);
-              field.setSelectionRange(newPosition, newPosition);
-            }
-          }
+        EDIT_STATE.set(fieldName, {
+          inputFormatter: inputFormatter,
+          blurFormatter: blurFormatter || inputFormatter,
+          dirty: false, literal: false, pasted: false, replaceOnInput: false, formatError: ''
         });
-
-        field.addEventListener('blur', function () {
-          const formatter = blurFormatter || inputFormatter;
-          const formatted = formatter(field.value);
-          if (field.value !== formatted) field.value = formatted;
-        });
+        field.addEventListener('input', function (event) { formatEditedInput(fieldName, event); });
+        field.addEventListener('blur', function () { commitField(fieldName); });
       }
 
       function bindFormatting() {
@@ -2965,9 +3174,10 @@
       }
 
       function fillPao2Fio2RatioField(ratio) {
-        DOM.form.pfRatio.value = ratio == null
-          ? ''
-          : core.formatNumber(core.roundNumber(ratio, 0), 0) + ' — ' + core.classifyPao2Fio2Ratio(ratio);
+        const description = document.getElementById('pfClassification');
+        DOM.form.pfRatio.value = ratio == null ? '' : core.formatNumber(core.roundNumber(ratio, 0), 0);
+        description.textContent = ratio == null ? '' : core.classifyPao2Fio2Ratio(ratio);
+        description.hidden = ratio == null;
       }
 
       function getAutoDerivedValues() {
@@ -2991,6 +3201,10 @@
       }
 
       function updateAutoCalculatedFields() {
+        if (hasPendingEdits() || hasFormatErrors()) {
+          clearDerivedFields();
+          return;
+        }
         syncBicarbonateFromGasometry();
         const derived = getAutoDerivedValues();
         fillAnionGapField(derived.anionGap);
@@ -2998,86 +3212,124 @@
         fillOxygenationIndexField(derived.oxygenationIndex);
       }
 
-      function calculate() {
+      function calculate(options) {
+        const manual = !options || options.manual !== false;
+        EDITABLE_FIELDS.forEach(normalizeCommittedField);
         try {
           clearAlertMessages();
           clearSensitiveFindings();
-
           const values = getFormValues();
+          collectInlineErrors(values, manual);
           updateAutoCalculatedFields();
+          const formatErrorName = EDITABLE_FIELDS.find(function (name) { return !!EDIT_STATE.get(name).formatError; });
+          if (formatErrorName) throw createValidationError(EDIT_STATE.get(formatErrorName).formatError, [formatErrorName]);
+          if (!manual && [values.ph, values.pco2, values.hco3Abg].some(function (value) { return !Number.isFinite(value); })) {
+            DOM.output.value = '';
+            resizeOutput();
+            renderInlineErrors();
+            const firstError = EDITABLE_FIELDS.find(function (name) { return INLINE_ERRORS.has(name); });
+            setStatus(firstError ? INLINE_ERRORS.get(firstError) : 'Pronto para cálculo.', !!firstError);
+            return;
+          }
           validateCoreInputs(values);
           values.anionGap = core.computeAnionGap(values.na, values.hco3Bio, values.cl, values.albumin);
           values.oxygenationIndex = core.computeOxygenationIndex(values.pmva, values.fio2, values.pao2);
           values.pao2Fio2Ratio = core.computePao2Fio2Ratio(values.pao2, values.fio2);
-
           const compatibility = core.collectCompatibilityAlerts(values);
           const result = core.classifyAcidBase(values);
-
           DOM.output.value = core.buildOutputText(result);
+          resizeOutput();
           showSensitiveFindings(result.sensitiveFindingsText);
           showAlertMessages(compatibility.messages, compatibility.fields);
-
+          renderInlineErrors();
           updateAppState(true, compatibility.messages.length > 0);
-          setStatus(
-            compatibility.messages.length
-              ? 'Cálculo concluído com alertas de compatibilidade.'
-              : 'Cálculo concluído.',
-            false
-          );
-
-          scrollToResult();
+          setStatus(compatibility.messages.length ? 'Cálculo concluído com alertas de compatibilidade.' : 'Cálculo concluído.', false);
+          if (manual) {
+            if (INLINE_ERRORS.size) focusFirstError();
+            else scrollToResult();
+          }
         } catch (error) {
           DOM.output.value = '';
+          resizeOutput();
           clearSensitiveFindings();
           updateAutoCalculatedFields();
-
+          updateAppState(false, true);
           if (error && error.type === 'validation') {
-            updateAppState(false, true);
+            (error.fields || []).forEach(function (name) { INLINE_ERRORS.set(name, error.message); });
             showAlertMessages([error.message], error.fields || []);
+            renderInlineErrors();
             setStatus(error.message, true);
-            scrollToResult();
+            if (manual) focusFirstError();
             return;
           }
-
-          updateAppState(false, true);
           showAlertMessages(['Falha inesperada ao calcular. Revise os dados informados.'], []);
+          renderInlineErrors();
           setStatus('Falha inesperada ao calcular.', true);
-          scrollToResult();
+          if (manual) scrollToResult();
         }
       }
 
       function resetState() {
         setTimeout(function () {
           DOM.output.value = '';
-          DOM.form.agap.value = '';
-          DOM.form.oi.value = '';
+          resizeOutput();
+          clearDerivedFields();
           clearSensitiveFindings();
           clearAlertMessages();
+          INLINE_ERRORS.clear();
+          EDIT_STATE.forEach(function (state) {
+            state.dirty = false; state.literal = false; state.pasted = false;
+            state.replaceOnInput = false; state.formatError = '';
+          });
+          renderInlineErrors();
           updateAppState(false, false);
           LAST_HCO3_SOURCE = 'hco3';
           BICARB_USER_EDITED = false;
           setStatus('Campos limpos.', false);
+          document.getElementById('gasometriaTab').open = true;
+          DOM.form.ph.focus();
         }, 0);
       }
 
       function bindAutoCalculationEvents() {
-        ['hco3', 'bicarb'].forEach(function (fieldName) {
-          DOM.form[fieldName].addEventListener('input', function () {
-            if (fieldName === 'bicarb') BICARB_USER_EDITED = DOM.form.bicarb.value.trim() !== '';
-            syncBicarbonateFields(fieldName);
-            updateAutoCalculatedFields();
+        ['agap', 'pfRatio', 'oi'].forEach(function (name) { DOM.form[name].setAttribute('tabindex', '-1'); });
+        EDITABLE_FIELDS.forEach(function (name) {
+          const field = DOM.form[name];
+          const state = EDIT_STATE.get(name);
+          field.setAttribute('enterkeyhint', 'next');
+          field.addEventListener('focus', function () { state.replaceOnInput = field.value !== ''; });
+          field.addEventListener('beforeinput', function (event) {
+            const insertion = String(event.inputType || '').indexOf('insert') === 0;
+            if (insertion && state.replaceOnInput) {
+              field.value = '';
+              state.literal = false; state.pasted = false; state.formatError = '';
+              state.replaceOnInput = false;
+            } else if (!insertion) state.replaceOnInput = false;
+            if (INPUT_RULES[name].decimals && event.data && /[,.]/.test(event.data)) state.literal = true;
           });
-
-          DOM.form[fieldName].addEventListener('blur', function () {
-            if (fieldName === 'bicarb') BICARB_USER_EDITED = DOM.form.bicarb.value.trim() !== '';
-            syncBicarbonateFields(fieldName);
-            updateAutoCalculatedFields();
+          field.addEventListener('paste', function (event) {
+            if (!event.clipboardData) return;
+            event.preventDefault();
+            const text = event.clipboardData.getData('text');
+            const before = state.replaceOnInput ? '' : field.value.slice(0, field.selectionStart);
+            const after = state.replaceOnInput ? '' : field.value.slice(field.selectionEnd);
+            state.literal = true; state.pasted = true; state.replaceOnInput = false;
+            field.value = before + text + after;
+            field.setSelectionRange((before + text).length, (before + text).length);
+            formatEditedInput(name, { inputType: 'insertFromPaste', data: null });
           });
-        });
-
-        AUTO_CALC_FIELDS.forEach(function (fieldName) {
-          DOM.form[fieldName].addEventListener('input', updateAutoCalculatedFields);
-          DOM.form[fieldName].addEventListener('blur', updateAutoCalculatedFields);
+          field.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            if (!commitField(name)) return;
+            const eligible = EDITABLE_FIELDS.filter(function (candidate) {
+              const section = DOM.form[candidate].closest('details');
+              return !section || section.open;
+            });
+            const next = eligible[eligible.indexOf(name) + 1];
+            if (next) DOM.form[next].focus();
+            else field.blur();
+          });
         });
       }
 
@@ -3139,11 +3391,13 @@
       function init() {
         forceInitialTabState();
         bindFormatting();
+        setupInlineErrors();
         bindMainEvents();
         bindAutoCalculationEvents();
-
-        // Os autotestes não interrompem a interface, mas falhas e exceções ficam registradas no console.
         runStartupSelfTests();
+        resizeOutput();
+        window.addEventListener('resize', resizeOutput);
+        DOM.form.ph.focus();
       }
 
       return Object.freeze({
