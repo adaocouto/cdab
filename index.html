@@ -1,6 +1,6 @@
 <!-- NomeDoApp = "Distúrbios Ácido-Base" -->
-<!-- AndroidVersionName = "1.012.10.19"; VersionName = "1.012.10.19" -->
-<!-- AndroidVersionCode = "262920733"; VersionCode = "262920733"; Timestamp = "2026-10-19T07:33:58.671646-03:00" -->
+<!-- AndroidVersionName = "1.012.10.20"; VersionName = "1.012.10.20" -->
+<!-- AndroidVersionCode = "262931401"; VersionCode = "262931401"; Timestamp = "2026-10-20T14:01:41.360388-03:00" -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -547,7 +547,7 @@
       </div>
     </details>
 
-    <div class="signature-block"><strong>Desenvolvido por Adão L. L. Couto</strong><br><span class="version-name">1.012.10.19</span></div>
+    <div class="signature-block"><strong>Desenvolvido por Adão L. L. Couto</strong><br><span class="version-name">1.012.10.20</span></div>
 
     <div class="spacer-3lines" aria-hidden="true"></div>
 
@@ -3291,6 +3291,107 @@
         }, 0);
       }
 
+
+      // Android/WebView state preservation, independent of Activity.saveState.
+      const APP_STATE_SCHEMA_VERSION = 1;
+      const APP_STATE_STORAGE_KEY = 'cdab_last_inputs_v1';
+      const PERSISTED_FIELDS = Object.freeze(['ph','pco2','hco3','na','bicarb','cl','albumin','pao2','fio2','pmva']);
+      const PERSISTED_TABS = Object.freeze(['gasometriaTab','dadosComplementaresTab','indiceOxigenacaoTab']);
+      let statePersistenceBlocked = false;
+      let stateSaveTimer = null;
+      let lastStorageRestoreSucceeded = false;
+
+      function readSavedState() {
+        try {
+          const raw = window.localStorage.getItem(APP_STATE_STORAGE_KEY);
+          if (!raw || raw.length > 15000) return null;
+          const data = JSON.parse(raw);
+          if (!data || data.version !== APP_STATE_SCHEMA_VERSION || !data.fields ||
+              typeof data.fields !== 'object' || !data.tabs || typeof data.tabs !== 'object') return null;
+          return data;
+        } catch (error) {
+          console.warn('[CDAB] Estado anterior indisponível; sem exclusão silenciosa.', error);
+          return null;
+        }
+      }
+
+      function saveUsefulState() {
+        if (statePersistenceBlocked) return;
+        if (stateSaveTimer !== null) { clearTimeout(stateSaveTimer); stateSaveTimer = null; }
+        const fields = {};
+        PERSISTED_FIELDS.forEach(function (name) { fields[name] = DOM.form[name].value; });
+        const tabs = {};
+        PERSISTED_TABS.forEach(function (name) { tabs[name] = document.getElementById(name).open; });
+        const payload = {
+          version: APP_STATE_SCHEMA_VERSION, fields: fields, tabs: tabs,
+          bicarbonateUserEdited: BICARB_USER_EDITED,
+          bicarbonateSource: LAST_HCO3_SOURCE,
+          showCalculatedInterpretation: APP_STATE.lastCalculationSucceeded && !!DOM.output.value,
+          scrollY: Math.max(0, Math.min(1000000, Math.round(window.scrollY || 0)))
+        };
+        try { window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(payload)); }
+        catch (error) { console.warn('[CDAB] Falha ao salvar último estado.', error); }
+      }
+
+      function debounceSaveUsefulState() {
+        if (statePersistenceBlocked) return;
+        if (stateSaveTimer !== null) clearTimeout(stateSaveTimer);
+        stateSaveTimer = setTimeout(saveUsefulState, 120);
+      }
+
+      function restoreSavedTabs() {
+        const data = readSavedState();
+        if (!data) return;
+        PERSISTED_TABS.forEach(function (name) {
+          if (typeof data.tabs[name] === 'boolean') document.getElementById(name).open = data.tabs[name];
+        });
+      }
+
+      function restoreUsefulState() {
+        const data = readSavedState();
+        if (!data) return false;
+        statePersistenceBlocked = true;
+        try {
+          PERSISTED_FIELDS.forEach(function (name) {
+            const rawValue = data.fields[name];
+            if (typeof rawValue === 'string' && rawValue.length <= 80) DOM.form[name].value = rawValue;
+          });
+          BICARB_USER_EDITED = data.bicarbonateUserEdited === true;
+          LAST_HCO3_SOURCE = data.bicarbonateSource === 'bicarb' ? 'bicarb' : 'hco3';
+          restoreSavedTabs();
+          if (data.showCalculatedInterpretation === true) calculate({ manual: false });
+          else updateAutoCalculatedFields();
+          if (typeof data.scrollY === 'number' && Number.isFinite(data.scrollY)) {
+            requestAnimationFrame(function () { window.scrollTo(0, Math.max(0, Math.min(data.scrollY, 1000000))); });
+          }
+          lastStorageRestoreSucceeded = true;
+        } finally { statePersistenceBlocked = false; }
+        return true;
+      }
+
+      function bindStatePersistence() {
+        DOM.form.addEventListener('input', debounceSaveUsefulState);
+        DOM.form.addEventListener('change', debounceSaveUsefulState);
+        DOM.form.addEventListener('focusout', debounceSaveUsefulState);
+        PERSISTED_TABS.forEach(function (name) {
+          document.getElementById(name).addEventListener('toggle', debounceSaveUsefulState);
+        });
+        DOM.calculateButton.addEventListener('click', function () { setTimeout(saveUsefulState, 0); });
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'hidden') saveUsefulState();
+        });
+        window.addEventListener('pagehide', saveUsefulState);
+        // The existing reset handler defers cleanup to a timer. Suppress autosave until it finishes.
+        DOM.form.addEventListener('reset', function () {
+          statePersistenceBlocked = true;
+          if (stateSaveTimer !== null) clearTimeout(stateSaveTimer);
+          stateSaveTimer = null;
+          try { window.localStorage.removeItem(APP_STATE_STORAGE_KEY); }
+          catch (error) { console.warn('[CDAB] Falha ao apagar estado após Limpar.', error); }
+          setTimeout(function () { statePersistenceBlocked = false; }, 0);
+        });
+      }
+
       function bindAutoCalculationEvents() {
         ['agap', 'pfRatio', 'oi'].forEach(function (name) { DOM.form[name].setAttribute('tabindex', '-1'); });
         EDITABLE_FIELDS.forEach(function (name) {
@@ -3395,9 +3496,11 @@
         bindMainEvents();
         bindAutoCalculationEvents();
         runStartupSelfTests();
+        bindStatePersistence();
+        const restoredPreviousInputs = restoreUsefulState();
         resizeOutput();
         window.addEventListener('resize', resizeOutput);
-        DOM.form.ph.focus();
+        if (!restoredPreviousInputs) DOM.form.ph.focus();
       }
 
       return Object.freeze({
@@ -3405,7 +3508,8 @@
         calculate,
         resetState,
         getFormValues,
-        updateAutoCalculatedFields
+        updateAutoCalculatedFields,
+        restoreSavedTabs
       });
     })(AcidBaseCore);
 
@@ -3420,6 +3524,7 @@
       const indiceOxigenacaoTab = document.getElementById('indiceOxigenacaoTab');
       if (dadosComplementaresTab) dadosComplementaresTab.removeAttribute('open');
       if (indiceOxigenacaoTab) indiceOxigenacaoTab.removeAttribute('open');
+      AcidBaseApp.restoreSavedTabs();
     });
 
   </script>
